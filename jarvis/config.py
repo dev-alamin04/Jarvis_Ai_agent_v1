@@ -6,10 +6,15 @@ Loads and exposes the YAML configuration. All modules import from here.
 import os
 from pathlib import Path
 import yaml
+from typing import Any
+from dotenv import load_dotenv
 
 # Root of the project (one level above this file)
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 CONFIG_PATH = PROJECT_ROOT / "config" / "config.yaml"
+
+# Automatically load environment variables from .env if present
+load_dotenv(PROJECT_ROOT / ".env")
 
 
 def _load() -> dict:
@@ -20,7 +25,7 @@ def _load() -> dict:
 _cfg: dict = _load()
 
 
-def get(key_path: str, default=None):
+def get(key_path: str, default: Any = None) -> Any:
     """
     Dot-separated key access, e.g. get("openai.model").
     """

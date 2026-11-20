@@ -160,8 +160,10 @@ def main() -> None:
         mute_listener.stop()
         sys.exit(0)
 
-    signal.signal(signal.SIGINT, _shutdown)
-    signal.signal(signal.SIGTERM, _shutdown)
+    import threading as _t
+    if _t.current_thread() is _t.main_thread():
+        signal.signal(signal.SIGINT, _shutdown)
+        signal.signal(signal.SIGTERM, _shutdown)
 
     logger.info("Jarvis voice agent running. Waiting for wake word…")
     ui_events.emit("state", state="idle")               # ← UI: initial state
