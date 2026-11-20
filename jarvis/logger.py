@@ -40,3 +40,9 @@ def action_log(tool: str, args: dict, result: str, approved: bool = True) -> Non
         f"RESULT={result[:300]!r}"
     )
     logger.info(entry)
+    try:
+        from jarvis import ui_events
+        ts_short = datetime.now().strftime("%H:%M:%S")
+        ui_events.emit("log", text=f"[{status}] {tool}", ts=ts_short)
+    except Exception:
+        pass

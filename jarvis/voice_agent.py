@@ -22,7 +22,7 @@ import signal
 import sys
 import threading
 
-from jarvis import audio_state
+from jarvis import audio_state, ui_events
 from jarvis.beep import activation_beep, mute_beep
 from jarvis.brain import process_turn
 from jarvis.config import get
@@ -57,6 +57,8 @@ def _on_activated() -> None:
     """Called the instant the wake word fires — before recording starts."""
     activation_beep()
     logger.info("Activation beep played. Listening for command…")
+    # ── UI state hook ──────────────────────────────────────────
+    ui_events.emit("state", state="wake")
 
 
 def _on_command_received(pcm_bytes: bytes) -> None:
@@ -65,27 +67,54 @@ def _on_command_received(pcm_bytes: bytes) -> None:
     Runs in the wake word thread; brain is thread-safe (stateless per call).
     """
     # 1. Transcribe
+    ui_events.emit("state", state="listening")          # ← UI hook
     text = transcribe(pcm_bytes)
     if not text:
+        ui_events.emit("state", state="idle")           # ← UI hook
         speak("Sorry, I didn't catch that.")
         return
 
     logger.info(f"User said: {text!r}")
     print(f"\nYou: {text}")
+    ui_events.emit("transcript", text=text)             # ← UI hook
 
     # 2. Brain
+    ui_events.emit("state", state="thinking")           # ← UI hook
+
+    # Wrap speak_fn so permission prompts update the UI state
+    def _speak_with_ui(spoken_text: str) -> None:
+        is_permission = (
+            "I want to run" in spoken_text and "Do you approve?" in spoken_text
+        )
+        if is_permission:
+            # Extract tool name from "I want to run `tool_name`…"
+            import re
+            m = re.search(r"I want to run `([^`]+)`", spoken_text)
+            tool = m.group(1) if m else "action"
+            ui_events.emit(
+                "state", state="permission",
+                tool=tool, detail=spoken_text[:200]
+            )
+        else:
+            ui_events.emit("state", state="speaking")
+        speak(spoken_text)
+        ui_events.emit("state", state="thinking")       # resume thinking after speak
+
     with _history_lock:
         reply = process_turn(
             user_text=text,
             conversation_history=_conversation_history,
-            speak_fn=speak,   # voice permission prompts
+            speak_fn=_speak_with_ui,
         )
 
     logger.info(f"Jarvis reply: {reply!r}")
     print(f"Jarvis: {reply}\n")
+    ui_events.emit("reply", text=reply)                 # ← UI hook
 
     # 3. Speak
+    ui_events.emit("state", state="speaking")           # ← UI hook
     speak(reply)
+    ui_events.emit("state", state="idle")               # ← UI hook
 
 
 def _on_mute_change(is_muted: bool) -> None:
@@ -94,6 +123,8 @@ def _on_mute_change(is_muted: bool) -> None:
     state_text = "Microphone muted." if is_muted else "Microphone unmuted."
     logger.info(state_text)
     print(f"[{state_text}]")
+    # ── UI state hook ──────────────────────────────────────────
+    ui_events.emit("state", state="muted" if is_muted else "idle")
     # Speak the state change only when unmuting (can't speak while muted anyway)
     if not is_muted:
         speak(state_text)
@@ -133,6 +164,7 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _shutdown)
 
     logger.info("Jarvis voice agent running. Waiting for wake word…")
+    ui_events.emit("state", state="idle")               # ← UI: initial state
     speak(f"Jarvis online. Say {_WAKE_WORD_TEXT} to give me a command.")
 
     # Keep main thread alive

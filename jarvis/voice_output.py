@@ -68,7 +68,14 @@ def speak(text: str) -> None:
     # Set speaking flag BEFORE playback (self-trigger guard)
     audio_state.speaking.set()
     try:
-        sd.play(audio, samplerate=_SAMPLE_RATE, blocking=True)
+        from jarvis import ui_events
+        chunk_size = 1024
+        with sd.OutputStream(samplerate=_SAMPLE_RATE, channels=1, dtype='float32') as stream:
+            for i in range(0, len(audio), chunk_size):
+                chunk = audio[i:i + chunk_size]
+                stream.write(chunk)
+                rms = float(np.sqrt(np.mean(chunk ** 2)))
+                ui_events.emit("level", value=min(1.0, rms * 3.5))
     except Exception as exc:
         logger.error(f"Audio playback failed: {exc}")
     finally:

@@ -264,6 +264,15 @@ class WakeWordListener:
             except queue.Empty:
                 continue
 
+            # Emit live mic audio level to UI
+            try:
+                from jarvis import ui_events
+                chunk_arr = np.frombuffer(raw, dtype=np.int16)
+                rms = float(np.sqrt(np.mean(chunk_arr.astype(np.float32) ** 2)))
+                ui_events.emit("level", value=min(1.0, rms / 8000.0))
+            except Exception:
+                pass
+
             # Extend deadline once speech starts
             if collector.is_collecting:
                 deadline = time.monotonic() + _SILENCE_TIMEOUT

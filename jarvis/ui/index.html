@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Jarvis</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;background:#000814;overflow:hidden;
+    font-family:'Courier New',Courier,monospace;color:#00d4ff;user-select:none}
+  canvas{display:block;position:fixed;inset:0}
+
+  /* ── Status overlay (bottom-centre) ─────────────────────────────── */
+  #hud{position:fixed;bottom:0;left:0;right:0;display:flex;flex-direction:column;
+       align-items:center;padding-bottom:28px;pointer-events:none;z-index:10}
+  #state-label{font-size:11px;letter-spacing:4px;text-transform:uppercase;
+                opacity:.7;margin-bottom:6px;transition:color .4s}
+  #transcript{font-size:13px;letter-spacing:1px;max-width:420px;text-align:center;
+               min-height:18px;opacity:.9;line-height:1.4}
+  #permission-box{display:none;border:1px solid #ff8c00;background:rgba(255,80,0,.08);
+                   padding:8px 16px;margin-top:8px;text-align:center;
+                   font-size:12px;letter-spacing:.5px;color:#ffb347;
+                   max-width:460px;line-height:1.5}
+
+  /* ── Log panel (top-left corner) ────────────────────────────────── */
+  #log-panel{position:fixed;top:20px;left:20px;width:280px;z-index:10;
+             pointer-events:none}
+  #log-title{font-size:9px;letter-spacing:3px;color:#00d4ff88;
+              border-bottom:1px solid #00d4ff22;padding-bottom:4px;
+              margin-bottom:6px;text-transform:uppercase}
+  .log-entry{font-size:10px;letter-spacing:.3px;padding:2px 0;
+              color:#00d4ff88;display:flex;gap:6px;align-items:flex-start}
+  .log-ts{color:#00d4ff44;white-space:nowrap;flex-shrink:0}
+  .log-dot{width:5px;height:5px;border-radius:50%;margin-top:4px;flex-shrink:0}
+  .log-text{flex:1;word-break:break-word;line-height:1.3}
+  .dot-ok{background:#00ff9f}
+  .dot-deny{background:#ff4444}
+  .dot-warn{background:#ffaa00}
+  .dot-info{background:#00d4ff}
+
+  /* ── Connection indicator (top-right) ───────────────────────────── */
+  #conn{position:fixed;top:20px;right:20px;font-size:9px;letter-spacing:2px;
+         text-transform:uppercase;opacity:.5;display:flex;align-items:center;gap:5px}
+  #conn-dot{width:6px;height:6px;border-radius:50%;background:#444;
+             transition:background .3s}
+  #conn-dot.on{background:#00ff9f;box-shadow:0 0 6px #00ff9f}
+  #conn-dot.off{background:#ff4444}
+
+  /* ── Mute badge ─────────────────────────────────────────────────── */
+  #mute-badge{display:none;position:fixed;top:50%;left:50%;
+               transform:translate(-50%,-50%) translateY(-170px);
+               font-size:10px;letter-spacing:3px;color:#888;
+               border:1px solid #444;padding:4px 10px;text-transform:uppercase}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<!-- HUD overlays -->
+<div id="hud">
+  <div id="state-label">INITIALISING</div>
+  <div id="transcript"></div>
+  <div id="permission-box"></div>
+</div>
+<div id="mute-badge">🔇 MUTED</div>
+
+<!-- Log panel -->
+<div id="log-panel">
+  <div id="log-title">Action Log</div>
+  <div id="log-entries"></div>
+</div>
+
+<!-- Connection indicator -->
+<div id="conn"><div id="conn-dot" class="off"></div>JARVIS</div>
+
+<script>
+"use strict";
+
+// ══════════════════════════════════════════════════════════════
+// 1. CONFIG (injected/defaulted; can be overridden by server)
+// ══════════════════════════════════════════════════════════════
+const CFG = {
+  wsPort    : 7779,
+  orbRadius : 100,          // base orb radius px
+  maxLogs   : 8,
+  fps       : 60,
+};
+
+// ══════════════════════════════════════════════════════════════
+// 2. STATE DEFINITIONS
+// ══════════════════════════════════════════════════════════════
+//  color / glowColor: [r,g,b]
+const STATES = {
+  idle      :{label:"IDLE — LISTENING",  color:[0,180,255],  glow:[0,80,200],   orbScale:1.0,  glowR:2.2, ringSpd:0.25,ptSpd:0.4, pulsF:0.7, pulsA:0.07, scanOn:true,  barOn:false},
+  wake      :{label:"WAKE WORD DETECTED",color:[0,230,255],  glow:[0,180,255],  orbScale:1.35, glowR:3.0, ringSpd:2.5, ptSpd:2.5, pulsF:4.0, pulsA:0.35, scanOn:false, barOn:false},
+  listening :{label:"LISTENING…",        color:[0,255,200],  glow:[0,180,160],  orbScale:1.08, glowR:2.5, ringSpd:0.8, ptSpd:1.0, pulsF:2.5, pulsA:0.12, scanOn:false, barOn:true },
+  thinking  :{label:"THINKING…",         color:[80,160,255], glow:[40,80,220],  orbScale:1.12, glowR:2.8, ringSpd:4.0, ptSpd:3.5, pulsF:5.0, pulsA:0.18, scanOn:true,  barOn:false},
+  speaking  :{label:"SPEAKING",          color:[0,210,255],  glow:[0,130,255],  orbScale:1.0,  glowR:2.6, ringSpd:1.5, ptSpd:1.5, pulsF:5.5, pulsA:0.22, scanOn:false, barOn:true },
+  permission:{label:"PERMISSION REQUIRED",color:[255,140,0], glow:[220,60,0],   orbScale:1.18, glowR:2.8, ringSpd:3.0, ptSpd:2.0, pulsF:3.5, pulsA:0.32, scanOn:false, barOn:false},
+  muted     :{label:"MUTED",             color:[70,70,70],   glow:[30,30,30],   orbScale:0.82, glowR:1.5, ringSpd:0.08,ptSpd:0.15,pulsF:0.4, pulsA:0.03, scanOn:false, barOn:false},
+  error     :{label:"ERROR",             color:[255,50,50],  glow:[180,0,0],    orbScale:0.92, glowR:2.5, ringSpd:5.0, ptSpd:4.0, pulsF:9.0, pulsA:0.45, scanOn:false, barOn:false},
+};
+
+// ── Interpolated (current) params ─────────────────────────────
+let cur = deepCopy(STATES.idle);
+let tgt = deepCopy(STATES.idle);
+let currentStateName = "idle";
+let audioLevel = 0;      // smoothed mic/TTS level 0–1
+let scanAngle  = 0;      // rotating scan line
+let t = 0;               // time in seconds
+
+function deepCopy(o){ return JSON.parse(JSON.stringify(o)); }
+
+// ══════════════════════════════════════════════════════════════
+// 3. CANVAS SETUP
+// ══════════════════════════════════════════════════════════════
+const canvas = document.getElementById("c");
+const ctx    = canvas.getContext("2d");
+let W, H, cx, cy, orbR;
+
+function resize(){
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  cx = W / 2; cy = H / 2;
+  orbR = Math.min(W, H) * 0.17;   // scale orb to window
+}
+window.addEventListener("resize", resize);
+resize();
+
+// ══════════════════════════════════════════════════════════════
+// 4. RING DEFINITIONS (angle & speed offsets for variety)
+// ══════════════════════════════════════════════════════════════
+const RINGS = [
+  {rf:1.40, w:1.5, dash:[0,0],     arc:Math.PI*2,     start: 0,     spd:+1.0, opacity:0.70, tickEvery: 45},
+  {rf:1.90, w:1.0, dash:[12,18],   arc:Math.PI*1.5,   start: 0.3,   spd:-0.6, opacity:0.50, tickEvery: 30},
+  {rf:2.50, w:0.7, dash:[4,24],    arc:Math.PI*0.75,  start: 1.1,   spd:+0.3, opacity:0.35, tickEvery: 0 },
+];
+
+// ══════════════════════════════════════════════════════════════
+// 5. PARTICLE SYSTEM
+// ══════════════════════════════════════════════════════════════
+const PARTICLE_COUNT = 55;
+let particles = [];
+
+class Particle {
+  constructor(){ this.reset(true); }
+  reset(randomPhase=false){
+    const band  = [1.6, 2.1, 2.8][Math.floor(Math.random()*3)];
+    this.orbitR  = orbR * band + Math.random() * orbR * 0.3;
+    this.angle   = Math.random() * Math.PI * 2;
+    this.speed   = (0.002 + Math.random() * 0.004) * (Math.random()<0.5?1:-1);
+    this.size    = 1.0 + Math.random() * 1.8;
+    this.alpha   = 0.2 + Math.random() * 0.5;
+    this.drift   = (Math.random() - 0.5) * 0.001;  // radial drift
+    if(randomPhase) this.angle = Math.random() * Math.PI * 2;
+  }
+  update(speedMul){
+    this.angle  += this.speed  * speedMul;
+    this.orbitR += this.drift  * speedMul * 2;
+    // Reset if drifted too far
+    const maxR = orbR * 3.2, minR = orbR * 1.1;
+    if(this.orbitR > maxR || this.orbitR < minR) this.reset();
+  }
+  draw(color, globalAlphaMul){
+    const x = cx + Math.cos(this.angle) * this.orbitR;
+    const y = cy + Math.sin(this.angle) * this.orbitR;
+    ctx.beginPath();
+    ctx.arc(x, y, this.size * cur.orbScale, 0, Math.PI*2);
+    ctx.fillStyle = rgba(color, this.alpha * globalAlphaMul);
+    ctx.fill();
+  }
+}
+
+function initParticles(){
+  particles = Array.from({length: PARTICLE_COUNT}, () => new Particle());
+}
+initParticles();
+
+// ══════════════════════════════════════════════════════════════
+// 6. WAVEFORM BARS (arc of vertical bars around ring 1)
+// ══════════════════════════════════════════════════════════════
+const BAR_COUNT = 48;
+let barHeights  = new Float32Array(BAR_COUNT);  // smoothed heights
+
+// ══════════════════════════════════════════════════════════════
+// 7. HELPERS
+// ══════════════════════════════════════════════════════════════
+function rgba([r,g,b], a){ return `rgba(${r|0},${g|0},${b|0},${a})`; }
+function lerp(a,b,t){ return a + (b-a)*t; }
+function lerpArr(a,b,t){ return a.map((v,i)=>lerp(v,b[i],t)); }
+function clamp(v,lo,hi){ return Math.min(hi,Math.max(lo,v)); }
+
+// Smooth transition speed (units: fraction per second)
+const TRANS_SPEED = 4.0;
+
+function lerpState(dt){
+  const k = clamp(TRANS_SPEED * dt, 0, 1);
+  cur.orbScale = lerp(cur.orbScale, tgt.orbScale, k);
+  cur.glowR    = lerp(cur.glowR,    tgt.glowR,    k);
+  cur.ringSpd  = lerp(cur.ringSpd,  tgt.ringSpd,  k);
+  cur.ptSpd    = lerp(cur.ptSpd,    tgt.ptSpd,    k);
+  cur.pulsF    = lerp(cur.pulsF,    tgt.pulsF,    k);
+  cur.pulsA    = lerp(cur.pulsA,    tgt.pulsA,    k);
+  cur.color    = lerpArr(cur.color,    tgt.color,    k);
+  cur.glow     = lerpArr(cur.glow,     tgt.glow,     k);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 8. DRAW FUNCTIONS
+// ══════════════════════════════════════════════════════════════
+
+// ── 8a. Background + subtle grid ─────────────────────────────
+function drawBackground(){
+  ctx.fillStyle = "#000814";
+  ctx.fillRect(0, 0, W, H);
+
+  // Vignette radial
+  const vg = ctx.createRadialGradient(cx, cy, orbR*1.5, cx, cy, Math.max(W,H));
+  vg.addColorStop(0, "rgba(0,8,20,0)");
+  vg.addColorStop(1, "rgba(0,0,0,0.6)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle grid lines
+  ctx.save();
+  ctx.strokeStyle = "rgba(0,80,120,0.07)";
+  ctx.lineWidth = 0.5;
+  const gs = 48;
+  for(let x=0; x<W; x+=gs){
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+  }
+  for(let y=0; y<H; y+=gs){
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+  ctx.restore();
+
+  // Corner bracket decorations
+  drawBracket(16, 16, 40, false, false);
+  drawBracket(W-16, 16, 40, true,  false);
+  drawBracket(16, H-16, 40, false, true);
+  drawBracket(W-16, H-16, 40, true, true);
+}
+
+function drawBracket(x, y, size, flipX, flipY){
+  const sx = flipX ? -1 : 1;
+  const sy = flipY ? -1 : 1;
+  const c  = rgba(cur.color, 0.25);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sx, sy);
+  ctx.strokeStyle = c;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(size, 0); ctx.lineTo(0, 0); ctx.lineTo(0, size);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ── 8b. Outer glow halo ───────────────────────────────────────
+function drawGlow(pulse){
+  const r = orbR * cur.orbScale * cur.glowR;
+  const g = ctx.createRadialGradient(cx,cy, 0, cx,cy, r);
+  g.addColorStop(0,   rgba(cur.glow, 0.22 * pulse));
+  g.addColorStop(0.35,rgba(cur.glow, 0.12 * pulse));
+  g.addColorStop(1,   rgba(cur.glow, 0));
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+}
+
+// ── 8c. Orb ───────────────────────────────────────────────────
+function drawOrb(pulse){
+  const r = orbR * cur.orbScale * (1 + Math.sin(t * cur.pulsF * Math.PI*2) * cur.pulsA * pulse);
+
+  // Soft outer edge fade
+  const fg = ctx.createRadialGradient(cx,cy, r*0.5, cx,cy, r*1.4);
+  fg.addColorStop(0,   rgba(cur.color, 0));
+  fg.addColorStop(0.4, rgba(cur.color, 0.08));
+  fg.addColorStop(1,   rgba(cur.color, 0));
+  ctx.fillStyle = fg;
+  ctx.beginPath(); ctx.arc(cx,cy, r*1.4,0,Math.PI*2); ctx.fill();
+
+  // Core gradient (sphere illusion: highlight top-left)
+  const hx = cx - r*0.28, hy = cy - r*0.28;
+  const og = ctx.createRadialGradient(hx,hy, 0, cx,cy, r);
+  og.addColorStop(0,   rgba([220,240,255], 0.95));
+  og.addColorStop(0.25,rgba(cur.color, 0.90));
+  og.addColorStop(0.65,rgba(cur.glow,  0.75));
+  og.addColorStop(1,   rgba(cur.glow,  0.60));
+  ctx.fillStyle = og;
+  ctx.beginPath(); ctx.arc(cx,cy, r, 0, Math.PI*2); ctx.fill();
+
+  // Rim light
+  ctx.save();
+  ctx.strokeStyle = rgba(cur.color, 0.4);
+  ctx.lineWidth   = 1;
+  ctx.beginPath(); ctx.arc(cx,cy, r, 0, Math.PI*2); ctx.stroke();
+  ctx.restore();
+}
+
+// ── 8d. Rotating rings ────────────────────────────────────────
+function drawRings(){
+  RINGS.forEach((ring, i) => {
+    const r     = orbR * cur.orbScale * ring.rf;
+    const angle = t * ring.spd * cur.ringSpd * Math.PI * 2;
+    const start = ring.start + angle;
+    const end   = start + ring.arc;
+    const op    = ring.opacity * (currentStateName === 'muted' ? 0.3 : 1.0);
+
+    ctx.save();
+    if(ring.dash[0]) ctx.setLineDash(ring.dash);
+    ctx.strokeStyle = rgba(cur.color, op);
+    ctx.lineWidth   = ring.w;
+    ctx.lineCap     = "round";
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, start, end);
+    ctx.stroke();
+
+    // Tick marks on ring 0
+    if(ring.tickEvery > 0 && i === 0){
+      ctx.setLineDash([]);
+      for(let deg=0; deg<360; deg+=ring.tickEvery){
+        const a   = (deg * Math.PI/180) + angle;
+        const len = (deg % 90 === 0) ? 10 : 5;
+        const x1  = cx + Math.cos(a) * r;
+        const y1  = cy + Math.sin(a) * r;
+        const x2  = cx + Math.cos(a) * (r - len);
+        const y2  = cy + Math.sin(a) * (r - len);
+        ctx.strokeStyle = rgba(cur.color, op * 0.7);
+        ctx.lineWidth   = 1;
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  });
+}
+
+// ── 8e. Scan line (idle + thinking) ──────────────────────────
+function drawScan(){
+  if(!tgt.scanOn) return;
+  scanAngle += (0.004 + cur.ringSpd * 0.003);
+  const scanR   = orbR * cur.orbScale * 2.6;
+  const tailArc = Math.PI / 4;
+
+  ctx.save();
+  const sg = ctx.createConicalGradient
+    ? ctx.createConicalGradient(cx, cy, scanAngle - tailArc)
+    : null;
+
+  // Fallback: draw thin sweep line
+  const x2 = cx + Math.cos(scanAngle) * scanR;
+  const y2 = cy + Math.sin(scanAngle) * scanR;
+  const sweep = ctx.createLinearGradient(cx, cy, x2, y2);
+  sweep.addColorStop(0,   rgba(cur.color, 0.0));
+  sweep.addColorStop(0.5, rgba(cur.color, 0.15));
+  sweep.addColorStop(1,   rgba(cur.color, 0.0));
+  ctx.strokeStyle = sweep;
+  ctx.lineWidth   = 1.5;
+  ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(x2,y2); ctx.stroke();
+
+  // Dot at tip
+  ctx.fillStyle = rgba(cur.color, 0.6);
+  ctx.beginPath(); ctx.arc(x2, y2, 2, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+// ── 8f. Waveform bars ─────────────────────────────────────────
+function drawWaveform(pulse){
+  if(!tgt.barOn && audioLevel < 0.02) return;
+  const r0   = orbR * cur.orbScale * RINGS[0].rf + 2;
+  const maxH = orbR * 0.45;
+  const lv   = currentStateName === 'listening'
+              ? audioLevel
+              : (audioLevel * 0.5 + Math.sin(t * cur.pulsF * Math.PI*2) * 0.08 * pulse);
+
+  for(let i=0; i<BAR_COUNT; i++){
+    // Smooth each bar toward target height
+    const tgtH = (lv + Math.sin(t * 8 + i * 0.42) * 0.1) * maxH * 0.9;
+    barHeights[i] = lerp(barHeights[i], tgtH, 0.18);
+
+    const a   = (i / BAR_COUNT) * Math.PI * 2;
+    const bH  = Math.max(1, barHeights[i]);
+    const x1  = cx + Math.cos(a) * r0;
+    const y1  = cy + Math.sin(a) * r0;
+    const x2  = cx + Math.cos(a) * (r0 + bH);
+    const y2  = cy + Math.sin(a) * (r0 + bH);
+    const op  = 0.4 + (barHeights[i] / maxH) * 0.6;
+
+    ctx.strokeStyle = rgba(cur.color, op);
+    ctx.lineWidth   = 1.5;
+    ctx.lineCap     = "round";
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  }
+}
+
+// ── 8g. Particles ─────────────────────────────────────────────
+function drawParticles(){
+  const ptAlpha = currentStateName === 'muted' ? 0.2 : 1.0;
+  particles.forEach(p => {
+    p.update(cur.ptSpd);
+    p.draw(cur.color, ptAlpha);
+  });
+}
+
+// ── 8h. Concentric ripple (speaking/wake) ─────────────────────
+let ripples = [];
+
+function spawnRipple(){
+  ripples.push({ r: orbR * cur.orbScale, life: 1.0 });
+}
+
+function drawRipples(){
+  ripples = ripples.filter(rp => rp.life > 0);
+  ripples.forEach(rp => {
+    rp.r    += 1.8 * (1 + audioLevel * 2);
+    rp.life -= 0.025;
+    ctx.save();
+    ctx.strokeStyle = rgba(cur.color, rp.life * 0.35);
+    ctx.lineWidth   = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, rp.r, 0, Math.PI*2); ctx.stroke();
+    ctx.restore();
+  });
+}
+
+// ── 8i. Mute X indicator ──────────────────────────────────────
+function drawMuteX(){
+  if(currentStateName !== 'muted') return;
+  const s = orbR * 0.25;
+  ctx.save();
+  ctx.strokeStyle = "rgba(120,120,120,0.6)";
+  ctx.lineWidth   = 2;
+  ctx.lineCap     = "round";
+  ctx.beginPath(); ctx.moveTo(cx-s, cy-s); ctx.lineTo(cx+s, cy+s); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx+s, cy-s); ctx.lineTo(cx-s, cy+s); ctx.stroke();
+  ctx.restore();
+}
+
+// ══════════════════════════════════════════════════════════════
+// 9. MAIN ANIMATION LOOP
+// ══════════════════════════════════════════════════════════════
+let lastTs = 0;
+let rippleTimer = 0;
+let errorTimer  = 0;
+let hidden = false;
+
+document.addEventListener("visibilitychange", () => { hidden = document.hidden; });
+
+function loop(ts){
+  requestAnimationFrame(loop);
+  if(hidden) return;   // pause when window is hidden (CPU saver)
+
+  const dt = Math.min((ts - lastTs) / 1000, 0.1);
+  lastTs = ts;
+  t += dt;
+
+  // Smooth-interpolate toward target state
+  lerpState(dt);
+
+  // Pulse multiplier (extra brightness for wake/permission/error)
+  const pulse = 1 + (currentStateName === 'wake' || currentStateName === 'permission'
+                   || currentStateName === 'error' ? 0.4 : 0);
+
+  // Auto-spawn ripples during speaking
+  if(currentStateName === 'speaking'){
+    rippleTimer -= dt;
+    if(rippleTimer <= 0 && audioLevel > 0.05){
+      spawnRipple();
+      rippleTimer = 0.18 - audioLevel * 0.12;
+    }
+  }
+
+  // Auto-spawn ripples on wake
+  if(currentStateName === 'wake'){
+    rippleTimer -= dt;
+    if(rippleTimer <= 0){ spawnRipple(); rippleTimer = 0.12; }
+  }
+
+  // Error state auto-resets after 1.5s
+  if(currentStateName === 'error'){
+    errorTimer -= dt;
+    if(errorTimer <= 0) setState('idle');
+  }
+
+  // ── Draw order (back to front) ──────────────
+  drawBackground();
+  drawGlow(pulse);
+  drawRipples();
+  drawParticles();
+  drawRings();
+  drawScan();
+  drawWaveform(pulse);
+  drawOrb(pulse);
+  drawMuteX();
+
+  // Decay audio level
+  audioLevel = lerp(audioLevel, 0, dt * 2.5);
+}
+
+requestAnimationFrame(loop);
+
+// ══════════════════════════════════════════════════════════════
+// 10. STATE TRANSITIONS
+// ══════════════════════════════════════════════════════════════
+const stateLabel      = document.getElementById("state-label");
+const transcriptEl    = document.getElementById("transcript");
+const permissionBox   = document.getElementById("permission-box");
+const muteBadge       = document.getElementById("mute-badge");
+
+function setState(name, extra={}){
+  const def = STATES[name];
+  if(!def){ console.warn("Unknown state:", name); return; }
+
+  currentStateName = name;
+  tgt = deepCopy(def);
+
+  // Update HUD text
+  stateLabel.textContent = def.label;
+  stateLabel.style.color = rgba(def.color, 0.9);
+
+  // Permission box
+  if(name === 'permission'){
+    permissionBox.style.display = "block";
+    const tool   = extra.tool   || "action";
+    const detail = extra.detail || "";
+    permissionBox.innerHTML =
+      `<b>PERMISSION REQUIRED</b><br>Tool: <b>${esc(tool)}</b><br>${esc(detail)}<br>
+       <span style="color:#ff8c00;font-size:11px">Say YES or NO to respond</span>`;
+  } else {
+    permissionBox.style.display = "none";
+  }
+
+  // Mute badge
+  muteBadge.style.display = (name === 'muted') ? "block" : "none";
+
+  // Spawn burst of ripples on wake
+  if(name === 'wake'){
+    for(let i=0;i<6;i++) setTimeout(spawnRipple, i*80);
+    rippleTimer = 0;
+  }
+
+  // Error auto-reset timer
+  if(name === 'error') errorTimer = 1.5;
+}
+
+function setTranscript(text){ transcriptEl.textContent = text; }
+
+// Escape HTML
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+// ══════════════════════════════════════════════════════════════
+// 11. LOG PANEL
+// ══════════════════════════════════════════════════════════════
+const logEntries = document.getElementById("log-entries");
+
+function addLog(text, ts, dotClass="dot-info"){
+  const entry = document.createElement("div");
+  entry.className = "log-entry";
+  entry.innerHTML =
+    `<span class="log-ts">${esc(ts)}</span>` +
+    `<span class="log-dot ${dotClass}"></span>` +
+    `<span class="log-text">${esc(text)}</span>`;
+  logEntries.prepend(entry);  // newest on top
+  // Trim to max
+  while(logEntries.children.length > CFG.maxLogs)
+    logEntries.removeChild(logEntries.lastChild);
+}
+
+function dotClassFromLog(text){
+  if(text.includes("DENIED"))   return "dot-deny";
+  if(text.includes("APPROVED")) return "dot-ok";
+  if(text.includes("WARN") || text.includes("PERMISSION")) return "dot-warn";
+  return "dot-info";
+}
+
+// ══════════════════════════════════════════════════════════════
+// 12. WEBSOCKET CLIENT (auto-reconnect)
+// ══════════════════════════════════════════════════════════════
+const connDot  = document.getElementById("conn-dot");
+let ws         = null;
+let reconnectDelay = 1000;
+
+function connect(){
+  ws = new WebSocket(`ws://127.0.0.1:${CFG.wsPort}`);
+
+  ws.onopen = () => {
+    connDot.className = "on";
+    reconnectDelay = 1000;
+    setState("idle");
+  };
+
+  ws.onclose = () => {
+    connDot.className = "off";
+    stateLabel.textContent = "DISCONNECTED";
+    ws = null;
+    setTimeout(connect, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 1.5, 10000);
+  };
+
+  ws.onerror = () => {};  // onclose handles cleanup
+
+  ws.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); }
+    catch { return; }
+    handleMessage(msg);
+  };
+}
+
+// ── Message handler ───────────────────────────────────────────
+function handleMessage(msg){
+  switch(msg.type){
+
+    case "state":
+      setState(msg.state, msg);
+      // Update transcript for key states
+      if(msg.state === "permission" && msg.detail){
+        setTranscript("");  // permission box has the detail
+      }
+      break;
+
+    case "level":
+      // Smooth incoming level (don't let UI jump)
+      audioLevel = lerp(audioLevel, clamp(msg.value || 0, 0, 1), 0.4);
+      break;
+
+    case "transcript":
+      setTranscript("You: " + (msg.text || ""));
+      break;
+
+    case "reply":
+      setTranscript("Jarvis: " + (msg.text || ""));
+      break;
+
+    case "log":
+      addLog(msg.text || "", msg.ts || "", dotClassFromLog(msg.text || ""));
+      break;
+  }
+}
+
+// Start connecting
+connect();
+
+// ══════════════════════════════════════════════════════════════
+// 13. WINDOW RESIZE: re-init particles so they scale correctly
+// ══════════════════════════════════════════════════════════════
+window.addEventListener("resize", () => { resize(); initParticles(); });
+
+</script>
+</body>
+</html>

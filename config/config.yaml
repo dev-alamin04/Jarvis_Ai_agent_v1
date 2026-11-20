@@ -49,6 +49,17 @@ wake_word:
   mute_hotkey: "<ctrl>+<shift>+m"  # global hotkey to toggle mic mute
   debug_save_audio: false        # save raw WAV to logs/debug_audio/ for debugging
 
+ui:
+  auto_start: true               # start UI automatically with jarvis_ui.py
+  ws_port: 7779                  # WebSocket server port (localhost only)
+  width: 440                     # window width px
+  height: 700                    # window height px
+  x: null                        # window X position (null = screen center)
+  y: null                        # window Y position
+  always_on_top: true            # keep window floating above other windows
+  frameless: true                # remove window titlebar/borders for HUD look
+  toggle_hotkey: "<ctrl>+<shift>+j"  # global hotkey to show/hide window
+
 apps:
   # Friendly name -> command
   code: "code"
