@@ -96,52 +96,7 @@ def _on_command_received(pcm_bytes: bytes) -> None:
     print(f"\nYou: {text}")
     ui_events.emit("transcript", text=text)             # ← UI hook
 
-    # ── Check for Spoken Panic or Resume Commands ──────────────
-    from jarvis.safety import (
-        is_panic_command,
-        activate_panic,
-        is_resume_command,
-        deactivate_panic,
-    )
-    if is_panic_command(text):
-        reply = activate_panic(speak_fn=speak)
-        print(f"Jarvis: {reply}\n")
-        ui_events.emit("reply", text=reply)
-        return
-
-    if is_resume_command(text):
-        reply = deactivate_panic(speak_fn=speak)
-        print(f"Jarvis: {reply}\n")
-        ui_events.emit("reply", text=reply)
-        return
-
-    # ── Check for Self-Review or Feature Improvement Commands ──
-    from jarvis.self_update import (
-        is_self_review_command,
-        handle_self_review_voice,
-        match_improve_feature_command,
-        handle_improve_feature_voice,
-    )
-    if is_self_review_command(text):
-        reply = handle_self_review_voice(speak_fn=speak)
-        print(f"Jarvis: {reply}\n")
-        ui_events.emit("reply", text=reply)
-        return
-
-    feat_target = match_improve_feature_command(text)
-    if feat_target:
-        reply = handle_improve_feature_voice(
-            feature_name=feat_target,
-            speak_fn=_speak_with_ui,
-        )
-        print(f"Jarvis: {reply}\n")
-        ui_events.emit("reply", text=reply)
-        return
-
-    # 2. Brain (with sentence-level TTS streaming)
-    ui_events.emit("state", state="thinking")           # ← UI hook
-
-    # Wrap speak_fn so permission prompts update the UI state
+    # Wrap speak_fn so permission prompts and speaking state update the UI
     def _speak_with_ui(spoken_text: str) -> None:
         is_permission = (
             "I want to run" in spoken_text and "Do you approve?" in spoken_text
@@ -159,6 +114,55 @@ def _on_command_received(pcm_bytes: bytes) -> None:
             ui_events.emit("state", state="speaking")
         speak(spoken_text)
         ui_events.emit("state", state="thinking")       # resume thinking after speak
+
+    # ── Check for Spoken Panic or Resume Commands ──────────────
+    from jarvis.safety import (
+        is_panic_command,
+        activate_panic,
+        is_resume_command,
+        deactivate_panic,
+    )
+    if is_panic_command(text):
+        reply = activate_panic(speak_fn=_speak_with_ui)
+        print(f"Jarvis: {reply}\n")
+        ui_events.emit("reply", text=reply)
+        ui_events.emit("state", state="idle")
+        return
+
+    if is_resume_command(text):
+        reply = deactivate_panic(speak_fn=_speak_with_ui)
+        print(f"Jarvis: {reply}\n")
+        ui_events.emit("reply", text=reply)
+        ui_events.emit("state", state="idle")
+        return
+
+    # ── Check for Self-Review or Feature Improvement Commands ──
+    from jarvis.self_update import (
+        is_self_review_command,
+        handle_self_review_voice,
+        match_improve_feature_command,
+        handle_improve_feature_voice,
+    )
+    if is_self_review_command(text):
+        reply = handle_self_review_voice(speak_fn=_speak_with_ui)
+        print(f"Jarvis: {reply}\n")
+        ui_events.emit("reply", text=reply)
+        ui_events.emit("state", state="idle")
+        return
+
+    feat_target = match_improve_feature_command(text)
+    if feat_target:
+        reply = handle_improve_feature_voice(
+            feature_name=feat_target,
+            speak_fn=_speak_with_ui,
+        )
+        print(f"Jarvis: {reply}\n")
+        ui_events.emit("reply", text=reply)
+        ui_events.emit("state", state="idle")
+        return
+
+    # 2. Brain (with sentence-level TTS streaming)
+    ui_events.emit("state", state="thinking")           # ← UI hook
 
     with _history_lock:
         from jarvis.memory import memory_manager
