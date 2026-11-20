@@ -32,3 +32,6 @@ mss>=9.0.0                 # fast in-memory screen capture
 pyautogui>=0.9.54          # mouse and keyboard automation
 python-xlib>=0.33          # X11/Xwayland interface for pyautogui
 pyperclip>=1.8.2           # system clipboard read/write
+
+# ── Unified Messaging ────────────────────────────────────────────────────────
+playwright>=1.40.0         # browser automation with persistent profiles

@@ -41,6 +41,7 @@ from jarvis.tools.browser import (
     browser_search,
     browser_fill_form,
 )
+from jarvis.tools.messaging_tools import send_message
 
 
 @dataclass
@@ -579,6 +580,37 @@ _TOOL_DEFS: list[ToolDef] = [
                 },
             },
             "required": ["fields"],
+        },
+    ),
+
+    # ── send_message ─────────────────────────────────────────────────────────
+    ToolDef(
+        name="send_message",
+        fn=send_message,
+        description=(
+            "Send a message to a person or group on Facebook Messenger, WhatsApp, or Telegram "
+            "using the user's dedicated, already logged-in browser profile. "
+            "The permission gate will always ask for user spoken confirmation before sending. "
+            "If the user did not specify the platform, ask which one before calling."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "platform": {
+                    "type": "string",
+                    "enum": ["whatsapp", "messenger", "telegram"],
+                    "description": "The messaging platform to use: 'whatsapp', 'messenger', or 'telegram'.",
+                },
+                "person_name": {
+                    "type": "string",
+                    "description": "The name of the contact or group to find and message.",
+                },
+                "text": {
+                    "type": "string",
+                    "description": "The exact message content to send.",
+                },
+            },
+            "required": ["platform", "person_name", "text"],
         },
     ),
 ]

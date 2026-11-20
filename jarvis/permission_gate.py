@@ -50,6 +50,7 @@ _ALWAYS_DANGEROUS_TOOLS: set[str] = {
     "delete_file",
     "delete_files",
     "overwrite_file",
+    "send_message",
 }
 
 # Tools that are always safe
@@ -158,7 +159,25 @@ def check(tool_name: str, args: dict, speak_fn=None) -> None:
     if tool_name in _ALWAYS_SAFE_TOOLS:
         return
 
-    # 2. Always-dangerous tools
+    # 2. Sending messages on messaging platforms ALWAYS requires explicit spoken confirmation
+    if tool_name == "send_message":
+        raw_platform = str(args.get("platform", "messaging platform"))
+        platform = {"whatsapp": "WhatsApp", "telegram": "Telegram", "messenger": "Facebook Messenger"}.get(
+            raw_platform.lower(), raw_platform.capitalize()
+        )
+        recipient = str(args.get("person_name", "the recipient"))
+        text = str(args.get("text", ""))
+        custom_prompt = f"Send on {platform} to {recipient}: {text}. Shall I send?"
+        _handle_dangerous(
+            tool_name,
+            args,
+            reason=f"delivering message on {platform}",
+            speak_fn=speak_fn,
+            custom_prompt=custom_prompt,
+        )
+        return
+
+    # 3. Always-dangerous tools
     if tool_name in _ALWAYS_DANGEROUS_TOOLS:
         reason = f"tool `{tool_name}` is always restricted"
         _handle_dangerous(tool_name, args, reason, speak_fn)
@@ -234,15 +253,18 @@ def check(tool_name: str, args: dict, speak_fn=None) -> None:
             return
 
 
-def _handle_dangerous(tool_name: str, args: dict, reason: str, speak_fn) -> None:
+def _handle_dangerous(tool_name: str, args: dict, reason: str, speak_fn, custom_prompt: str | None = None) -> None:
     """
     Announce the dangerous action and wait for user approval.
     Raises PermissionDenied if denied.
     """
-    prompt = (
-        f"I want to run `{tool_name}` because {reason}. "
-        f"Arguments: {_scrub(args)}. Do you approve?"
-    )
+    if custom_prompt:
+        prompt = custom_prompt
+    else:
+        prompt = (
+            f"I want to run `{tool_name}` because {reason}. "
+            f"Arguments: {_scrub(args)}. Do you approve?"
+        )
     logger.warning(f"PERMISSION CHECK — {prompt}")
 
     if speak_fn:
@@ -259,9 +281,15 @@ def _handle_dangerous(tool_name: str, args: dict, reason: str, speak_fn) -> None
 
 
 def _scrub(args: dict) -> dict:
-    """Remove any secrets from args before logging."""
+    """Remove any secrets from args before logging (and do not log message text)."""
     sensitive_keys = {"api_key", "password", "secret", "token", "key"}
-    return {
-        k: ("***" if any(s in k.lower() for s in sensitive_keys) else v)
-        for k, v in args.items()
-    }
+    scrubbed = {}
+    for k, v in args.items():
+        if any(s in k.lower() for s in sensitive_keys):
+            scrubbed[k] = "***"
+        elif k == "text" and "platform" in args:
+            # Privacy rule: Never log private message text
+            scrubbed[k] = f"<{len(str(v))} chars>"
+        else:
+            scrubbed[k] = v
+    return scrubbed

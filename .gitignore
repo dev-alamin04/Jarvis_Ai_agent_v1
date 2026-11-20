@@ -21,6 +21,8 @@ logs/*.log
 data/*.db
 data/*.db-journal
 data/*.db-wal
+data/*.json
+data/browser_profiles/
 
 # ── Secrets ──────────────────────────────────────
 .env

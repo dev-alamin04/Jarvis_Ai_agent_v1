@@ -128,3 +128,15 @@ services:
   redis:
     command: "sudo systemctl"
     name: "Redis"
+
+messaging:
+  daily_limit: 20                  # Maximum messages per platform per day (rate limiting)
+  headless: false                  # Headed (visible) browser by default; true for headless
+  browser_executable: "/usr/bin/google-chrome" # Path to system Chrome/Chromium executable (null for Playwright default)
+  typing_delay_range_ms: [35, 75]  # Human-like typing delay per character (ms)
+  human_delay_range_s: [0.4, 0.9]  # Random human-like delay between steps (s)
+  profiles_dir: "data/browser_profiles" # Root directory for persistent browser sessions
+  telegram:
+    backend: "web"                 # "web" (Telegram Web A via Playwright) | "telethon" (MTProto client API)
+    # api_id: null                 # Optional MTProto api_id if using telethon backend
+    # api_hash: null               # Optional MTProto api_hash if using telethon backend
