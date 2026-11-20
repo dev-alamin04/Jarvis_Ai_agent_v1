@@ -109,16 +109,19 @@ class StreamingTTSPlayer:
         """Queue a sentence for speech synthesis."""
         clean = sentence.strip()
         if clean:
+            # Keep speaking flag set while sentences are queued
+            audio_state.speaking.set()
             self._sentence_queue.put(clean)
 
     def finish(self) -> None:
-        """Signal no more sentences; wait for playback to finish."""
+        """Signal no more sentences; wait for playback of all queued sentences to finish."""
         self._sentence_queue.put(None)
         if self._fetcher_thread:
             self._fetcher_thread.join(timeout=10.0)
         if self._player_thread:
             self._player_thread.join(timeout=15.0)
-        audio_state.speaking.clear()
+        audio_state.mark_speaking_ended()
+        audio_state.flush_all_pcm()
 
     def abort(self) -> None:
         """Immediately stop playback and clear queues."""
@@ -135,7 +138,8 @@ class StreamingTTSPlayer:
                 break
         self._sentence_queue.put(None)
         self._audio_queue.put(None)
-        audio_state.speaking.clear()
+        audio_state.mark_speaking_ended()
+        audio_state.flush_all_pcm()
 
     # ── Fetch worker (generates PCM via OpenAI TTS) ───────────────────────────
 

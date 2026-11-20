@@ -74,14 +74,22 @@ def server_analyze_logs(
     cmd = f"tail -n {min(lines, 300)} {log_path}"
     code, raw_logs, err = execute_remote_command(canonical_server, cmd)
 
+    if code == 255:
+        # SSH connection failed — report honestly, never substitute fake data.
+        return (
+            f"### 📋 Log Analysis: `{canonical_server}` ({log_type})\n"
+            f"❌ **Could not connect to {canonical_server}**: {err or 'SSH connection failed.'}\n\n"
+            f"I could not read the logs because the server is unreachable."
+        )
+
     if code != 0 or not raw_logs.strip():
-        # Fallback simulation or file not found
         if "No such file" in err:
             return f"Log file `{log_path}` was not found on `{canonical_server}`."
-        raw_logs = (
-            "[2026-11-20 15:40:12] production.ERROR: SQLSTATE[HY000] [2002] Connection refused "
-            "(Connection: mysql, Host: 127.0.0.1, Port: 3306) in /var/www/app/vendor/laravel/framework/src/Illuminate/Database/Connectors/MySqlConnector.php:38\n"
-            "[2026-11-20 15:40:15] production.ERROR: RedisException: Connection refused in /var/www/app/vendor/predis/predis/src/Connection/StreamConnection.php:128"
+        # Non-zero exit but server reachable — report the shell error honestly.
+        return (
+            f"### 📋 Log Analysis: `{canonical_server}` ({log_type})\n"
+            f"⚠️ **Remote command returned exit code {code}**: {err or raw_logs or 'No output.'}\n\n"
+            f"Check that `{log_path}` exists on the server and that the SSH user has read access."
         )
 
     # Analyze errors

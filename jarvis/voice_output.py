@@ -101,10 +101,14 @@ def speak(text: str) -> None:
     """
     Convert text to speech and play it.
     Blocks until playback finishes.
-    Sets audio_state.speaking for the full duration.
+    Sets audio_state.speaking for the full duration including API request and playback.
     """
     if not text:
         return
+
+    # Set speaking flag for the whole duration of TTS generation and playback
+    audio_state.speaking.set()
+    audio_state.interrupted.clear()
 
     logger.info(f"TTS: {text[:80]!r}…")
 
@@ -126,26 +130,12 @@ def speak(text: str) -> None:
         pcm_bytes = response.content
     except Exception as exc:
         logger.error(f"TTS failed: {exc}")
-        # Fall back to silent failure — don't crash the main loop
+        audio_state.mark_speaking_ended()
+        audio_state.flush_all_pcm()
         return
 
     # Convert 16-bit PCM bytes to float32 array
     audio = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
-
-    # Set speaking flag BEFORE playback (self-trigger guard)
-    audio_state.speaking.set()
-    audio_state.interrupted.clear()
-
-    # Launch background monitor for 'stop' / 'quiet' interruption
-    import threading
-    stop_monitor = threading.Event()
-    monitor_thread = threading.Thread(
-        target=_interrupt_monitor,
-        args=(stop_monitor,),
-        name="interrupt-monitor",
-        daemon=True,
-    )
-    monitor_thread.start()
 
     try:
         from jarvis import ui_events
@@ -162,5 +152,5 @@ def speak(text: str) -> None:
     except Exception as exc:
         logger.error(f"Audio playback failed: {exc}")
     finally:
-        stop_monitor.set()
-        audio_state.speaking.clear()
+        audio_state.mark_speaking_ended()
+        audio_state.flush_all_pcm()

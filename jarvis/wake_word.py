@@ -95,6 +95,7 @@ class WakeWordListener:
     def start(self) -> None:
         """Load model and start background thread."""
         self._load_model()
+        audio_state.register_flush_callback(self.flush_pcm_queue)
         self._thread = threading.Thread(
             target=self._run_loop,
             name="wake-word-listener",
@@ -112,6 +113,14 @@ class WakeWordListener:
         if self._thread:
             self._thread.join(timeout=3.0)
         logger.info("WakeWordListener stopped.")
+
+    def flush_pcm_queue(self) -> None:
+        """Drop all buffered PCM audio chunks from queue."""
+        while not self._pcm_queue.empty():
+            try:
+                self._pcm_queue.get_nowait()
+            except queue.Empty:
+                break
 
     # ── Model loading ───────────────────────────────────────────────────────
 
@@ -154,8 +163,11 @@ class WakeWordListener:
         """sounddevice callback — runs in C audio thread, must be fast."""
         if status:
             logger.debug(f"sounddevice status: {status}")
-        # Drop audio only when explicitly muted (allows wake word barge-in during speech)
+        # Drop audio when explicitly muted
         if audio_state.muted.is_set():
+            return
+        # Drop all mic audio until playback ends plus a 0.7 second tail
+        if audio_state.is_speaking(tail_s=0.7):
             return
         try:
             self._pcm_queue.put_nowait(indata.tobytes())
@@ -178,7 +190,25 @@ class WakeWordListener:
 
     def _detection_loop(self) -> None:
         """Read chunks, run OWW inference, trigger on detection."""
+        was_speaking = False
         while not audio_state.shutdown.is_set():
+            # Drop mic audio and flush queue until playback ends plus a 0.7s tail
+            if audio_state.is_speaking(tail_s=0.7):
+                was_speaking = True
+                self.flush_pcm_queue()
+                time.sleep(0.05)
+                continue
+
+            # When speaking ends, ensure PCM queue is flushed and reset model buffer
+            if was_speaking:
+                was_speaking = False
+                self.flush_pcm_queue()
+                if self._oww_model:
+                    try:
+                        self._oww_model.reset()
+                    except Exception:
+                        pass
+
             try:
                 raw = self._pcm_queue.get(timeout=0.1)
             except queue.Empty:
@@ -276,6 +306,12 @@ class WakeWordListener:
         while time.monotonic() < deadline:
             if audio_state.shutdown.is_set():
                 return None
+
+            # Drop mic audio if speaking or within 0.7s tail
+            if audio_state.is_speaking(tail_s=0.7):
+                self.flush_pcm_queue()
+                time.sleep(0.05)
+                continue
 
             try:
                 raw = self._pcm_queue.get(timeout=0.1)

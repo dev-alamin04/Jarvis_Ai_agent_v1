@@ -14,25 +14,28 @@ import io
 import os
 import wave
 
-from openai import OpenAI
+import openai
 
 from jarvis.config import TRANSCRIPTION_MODEL
 from jarvis.logger import logger
 
-_client: OpenAI | None = None
+_client: openai.OpenAI | None = None
 
 
-def _get_client() -> OpenAI:
+def _get_client() -> openai.OpenAI:
     global _client
-    if _client is None:
+    if _client is None or os.environ.get("JARVIS_TEST_MODE") == "1":
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY not set.")
-        _client = OpenAI(api_key=api_key)
+        client_instance = openai.OpenAI(api_key=api_key)
+        if os.environ.get("JARVIS_TEST_MODE") != "1":
+            _client = client_instance
+        return client_instance
     return _client
 
 
-def transcribe(pcm_bytes: bytes, sample_rate: int = 16_000) -> str:
+def transcribe(pcm_bytes: bytes, sample_rate: int = 16_000, min_words: int = 0) -> str:
     """
     Send raw 16-bit mono PCM to OpenAI Whisper and return the transcript.
 
@@ -42,11 +45,13 @@ def transcribe(pcm_bytes: bytes, sample_rate: int = 16_000) -> str:
         Raw 16-bit mono PCM audio.
     sample_rate : int
         Sample rate (must be 16000 for OWW pipeline).
+    min_words : int
+        Minimum word count required. Shorter transcriptions return empty string.
 
     Returns
     -------
     str
-        Transcribed text, or empty string on error.
+        Transcribed text, or empty string on error or if shorter than min_words.
     """
     if not pcm_bytes:
         return ""
@@ -91,6 +96,9 @@ def transcribe(pcm_bytes: bytes, sample_rate: int = 16_000) -> str:
         )
         text = result.text.strip()
         logger.info(f"Transcribed: {text!r}")
+        if min_words > 0 and len(text.split()) < min_words:
+            logger.info(f"Ignoring transcription shorter than {min_words} words ({len(text.split())} words): {text!r}")
+            return ""
         return text
     except Exception as exc:
         logger.error(f"Transcription failed: {exc}")

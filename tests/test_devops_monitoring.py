@@ -25,6 +25,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+# ---------------------------------------------------------------------------
+# Enable SSH simulation for all tests that rely on simulated server responses.
+# Tests that specifically verify REAL connection-failure behaviour MUST unset
+# this flag temporarily inside their own context.
+# ---------------------------------------------------------------------------
+os.environ["JARVIS_MOCK_SSH"] = "1"
+
 from jarvis.devops.backup import server_check_backups
 from jarvis.devops.config import (
     find_server,
@@ -460,6 +467,140 @@ def test_tool_registry_and_risk_table_integration():
     print("  ✓ Tool registry and risk table integration passed.")
 
 
+# ── 10. SSH honesty: connection failure → error result, never fake data ────────
+
+def test_ssh_connection_failure_returns_error_not_simulation():
+    """A real connection failure must return exit 255 with an error message.
+    Fake / simulated output must NEVER appear in the response."""
+    print("[TEST] SSH connection failure returns honest error...")
+
+    # Temporarily disable simulation so we exercise the real connection path.
+    env_backup = os.environ.pop("JARVIS_MOCK_SSH", None)
+    try:
+        import paramiko
+        # Simulate a network-level refusal (paramiko raises this for unreachable hosts).
+        with patch.object(
+            paramiko.SSHClient,
+            "connect",
+            side_effect=socket.error("Connection refused"),
+        ):
+            # We also need a non-placeholder host so the placeholder guard doesn't
+            # fire first.  Patch find_server to return a realistic entry.
+            fake_server = {
+                "name": "cloudpanel_prod",
+                "host": "192.0.2.1",   # TEST-NET — routable but unreachable
+                "port": 22,
+                "user": "clp",
+                "key_path": "~/.ssh/id_rsa",
+                "type": "CloudPanel",
+                "services": ["nginx", "mysql", "redis"],
+            }
+            with patch("jarvis.devops.ssh_client.find_server", return_value=fake_server):
+                rc, stdout, stderr = execute_remote_command("cloudpanel_prod", "df -h /")
+
+        assert rc == 255, f"Expected exit code 255, got {rc}"
+        assert "cloudpanel_prod" in stderr or "192.0.2.1" in stderr or "failed" in stderr.lower(), (
+            f"Expected descriptive error in stderr, got: {stderr!r}"
+        )
+
+        # Must NOT contain any simulated content
+        simulated_markers = ["32%", "RUNNING", "active", "Simulated output"]
+        for marker in simulated_markers:
+            assert marker not in stdout, (
+                f"Simulated marker {marker!r} found in stdout — fake data was returned on failure!"
+            )
+            assert marker not in stderr, (
+                f"Simulated marker {marker!r} found in stderr — fake data was returned on failure!"
+            )
+
+    finally:
+        if env_backup is not None:
+            os.environ["JARVIS_MOCK_SSH"] = env_backup
+
+    print("  ✓ Connection failure returns honest error, no simulation leak.")
+
+
+def test_placeholder_host_refused():
+    """A server whose host is 127.0.0.1 / localhost / *.example.com must be
+    refused immediately with exit 255 and a clear 'placeholder values' message."""
+    print("[TEST] Placeholder host detection...")
+
+    env_backup = os.environ.pop("JARVIS_MOCK_SSH", None)
+    try:
+        for placeholder in ("127.0.0.1", "localhost", "my.example.com"):
+            fake_server = {
+                "name": "test_server",
+                "host": placeholder,
+                "port": 22,
+                "user": "root",
+                "key_path": "~/.ssh/id_rsa",
+                "type": "VPS",
+                "services": [],
+            }
+            with patch("jarvis.devops.ssh_client.find_server", return_value=fake_server):
+                rc, stdout, stderr = execute_remote_command("test_server", "uptime")
+
+            assert rc == 255, f"Expected 255 for placeholder host {placeholder!r}, got {rc}"
+            assert "placeholder" in stderr.lower(), (
+                f"Expected 'placeholder' in stderr for host {placeholder!r}, got: {stderr!r}"
+            )
+            assert stdout == "", f"Expected empty stdout for placeholder host, got: {stdout!r}"
+
+    finally:
+        if env_backup is not None:
+            os.environ["JARVIS_MOCK_SSH"] = env_backup
+
+    print("  ✓ Placeholder hosts are refused with clear message.")
+
+
+def test_simulation_only_with_mock_flag():
+    """Verify that JARVIS_MOCK_SSH=1 returns simulated output, and without
+    the flag a connection failure returns an error — never simulated data."""
+    print("[TEST] Simulation gate: JARVIS_MOCK_SSH controls access to fake data...")
+
+    # 1. With JARVIS_MOCK_SSH=1 — simulation should return expected content.
+    os.environ["JARVIS_MOCK_SSH"] = "1"
+    # Use a placeholder host: simulation must still work even with JARVIS_MOCK_SSH=1
+    # because the placeholder guard fires BEFORE the simulation check.
+    # To test simulation, use a non-placeholder host via patched find_server.
+    real_looking_server = {
+        "name": "cloudpanel_prod",
+        "host": "10.0.0.1",  # private range, non-placeholder
+        "port": 22,
+        "user": "clp",
+        "key_path": "~/.ssh/id_rsa",
+        "type": "CloudPanel",
+        "services": ["nginx", "mysql", "redis"],
+    }
+    with patch("jarvis.devops.ssh_client.find_server", return_value=real_looking_server):
+        rc_sim, out_sim, _ = execute_remote_command("cloudpanel_prod", "df -h /")
+    assert rc_sim == 0, f"Expected 0 from simulation, got {rc_sim}"
+    assert "32%" in out_sim or "Filesystem" in out_sim, (
+        f"Expected simulated disk output, got: {out_sim!r}"
+    )
+
+    # 2. Without JARVIS_MOCK_SSH — connection failure must return error, not fake data.
+    del os.environ["JARVIS_MOCK_SSH"]
+    try:
+        import paramiko
+        with patch.object(paramiko.SSHClient, "connect", side_effect=socket.error("refused")):
+            with patch("jarvis.devops.ssh_client.find_server", return_value=real_looking_server):
+                rc_fail, out_fail, err_fail = execute_remote_command("cloudpanel_prod", "df -h /")
+
+        assert rc_fail == 255
+        assert "32%" not in out_fail and "Filesystem" not in out_fail, (
+            "Simulated disk data must NOT appear when JARVIS_MOCK_SSH is unset and connection fails."
+        )
+        assert "failed" in err_fail.lower() or "connection" in err_fail.lower(), (
+            f"Expected connection failure message in stderr, got: {err_fail!r}"
+        )
+    finally:
+        # Restore for any remaining tests
+        os.environ["JARVIS_MOCK_SSH"] = "1"
+
+    print("  ✓ Simulation gate: flag controls access correctly.")
+
+
 if __name__ == "__main__":
     test_config_loading_and_fuzzy_matching()
     test_audit_logging_and_scrubbing()
@@ -470,4 +611,7 @@ if __name__ == "__main__":
     test_devops_permission_gate()
     test_background_watcher_and_proactive_alerts()
     test_tool_registry_and_risk_table_integration()
+    test_ssh_connection_failure_returns_error_not_simulation()
+    test_placeholder_host_refused()
+    test_simulation_only_with_mock_flag()
     print("\n🎉 ALL DEVOPS & SERVER MONITORING TESTS PASSED SUCCESSFULLY! 🎉")

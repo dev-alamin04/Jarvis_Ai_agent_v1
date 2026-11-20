@@ -73,13 +73,24 @@ def _on_command_received(pcm_bytes: bytes) -> None:
 
     # 1. Transcribe
     ui_events.emit("state", state="listening")          # ← UI hook
-    text = transcribe(pcm_bytes)
+    text = transcribe(pcm_bytes, min_words=2)
     timing.mark_stt_end(text)
 
-    if not text:
+    # Ignore any transcription shorter than 2 words or empty
+    words = text.strip().split() if text else []
+    if len(words) < 2:
+        logger.info(f"Ignoring short or empty transcription ({len(words)} words): {text!r}")
         ui_events.emit("state", state="idle")           # ← UI hook
-        speak("Sorry, I didn't catch that.")
         return
+
+    # Never accept approve, yes, or merge confirmations that arrive while the agent was speaking
+    import re
+    clean_words = set(re.findall(r"\b\w+\b", text.lower()))
+    if clean_words & {"approve", "yes", "merge", "approved", "merged"}:
+        if audio_state.is_speaking(tail_s=0.7):
+            logger.warning(f"Refusing confirmation '{text}' because agent was speaking or within tail.")
+            ui_events.emit("state", state="idle")
+            return
 
     logger.info(f"User said: {text!r}")
     print(f"\nYou: {text}")

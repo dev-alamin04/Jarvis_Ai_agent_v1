@@ -47,8 +47,19 @@ def server_health_check(server_name: str) -> str:
     canonical_name = server["name"]
     logger.info(f"[DevOps Health] Checking health for {canonical_name}...")
 
-    # 1. Disk usage
-    _, disk_out, _ = execute_remote_command(canonical_name, "df -h /")
+    # 1. Disk usage — first call also acts as a connectivity probe.
+    disk_rc, disk_out, disk_err = execute_remote_command(canonical_name, "df -h /")
+
+    if disk_rc == 255:
+        # SSH connection failed; return an honest error immediately.
+        return (
+            f"### 🖥️ Health Report: `{canonical_name}`\n"
+            f"❌ **Could not connect to {canonical_name}**: {disk_err or 'SSH connection failed.'}\n\n"
+            f"I could not retrieve health data because the server is unreachable. "
+            f"Please verify that the server is online and your SSH key is correct."
+        )
+
+    _ = disk_rc  # already checked above
     disk_usage = "Unknown"
     disk_avail = "Unknown"
     for line in disk_out.splitlines():
