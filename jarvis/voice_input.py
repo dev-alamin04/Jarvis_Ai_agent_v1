@@ -61,9 +61,16 @@ def transcribe(pcm_bytes: bytes, sample_rate: int = 16_000) -> str:
     wav_buf.seek(0)
     wav_buf.name = "audio.wav"  # OpenAI SDK reads .name for MIME type
 
+    audio_duration_sec = len(pcm_bytes) / sample_rate / 2.0
     logger.info(
-        f"Transcribing {len(pcm_bytes) / sample_rate / 2:.1f}s of audio…"
+        f"Transcribing {audio_duration_sec:.1f}s of audio…"
     )
+
+    try:
+        from jarvis.cost.tracker import track_transcription
+        track_transcription(audio_seconds=audio_duration_sec, model=TRANSCRIPTION_MODEL)
+    except Exception as exc:
+        logger.debug(f"[Cost Tracking] Transcription tracking error: {exc}")
 
     try:
         client = _get_client()

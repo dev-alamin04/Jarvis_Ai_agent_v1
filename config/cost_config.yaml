@@ -1,0 +1,54 @@
+# Cost Tracking & Spending Limits Configuration for Jarvis
+# Controls budget limits, warning thresholds, model downgrade, and per-model rates.
+
+cost:
+  # Daily budget in USD. At 80% Jarvis warns by voice. At 100% switches to cheaper model.
+  daily_limit_usd: 1.00
+
+  # Monthly budget in USD.
+  monthly_limit_usd: 30.00
+
+  # Warning threshold ratio (0.80 = 80% of limit)
+  warning_threshold: 0.80
+
+  # Hard limit threshold ratio (1.00 = 100% of limit)
+  hard_limit_threshold: 1.00
+
+  # Model to automatically switch to when 100% of budget is reached
+  cheaper_model: "gpt-4o-mini"
+
+  # Tools classified as expensive that require user spoken confirmation when at 100% limit
+  expensive_tools:
+    - "take_screenshot"
+    - "fix_screen_error"
+    - "describe_screen"
+    - "recon_full_scan"
+    - "server_deploy"
+    - "laravel_debug_and_fix"
+
+  # Pricing rates (USD per million tokens or per minute/character)
+  rates:
+    # OpenAI Chat Models (prompt & completion per 1M tokens)
+    gpt-4o:
+      prompt_per_million: 2.50
+      completion_per_million: 10.00
+    gpt-4o-mini:
+      prompt_per_million: 0.15
+      completion_per_million: 0.60
+    # Fallback / alias models
+    gpt-4-turbo:
+      prompt_per_million: 10.00
+      completion_per_million: 30.00
+    gpt-3.5-turbo:
+      prompt_per_million: 0.50
+      completion_per_million: 1.50
+
+    # OpenAI Audio Models
+    whisper-1:
+      per_minute: 0.006          # $0.006/min = $0.0001/sec
+
+    # OpenAI Speech Synthesis (TTS) Models
+    tts-1:
+      per_million_chars: 15.00   # $15.00 per 1M chars = $0.000015/char
+    tts-1-hd:
+      per_million_chars: 30.00   # $30.00 per 1M chars = $0.000030/char

@@ -95,6 +95,10 @@ from jarvis.tools.assistant_tools import (
     get_daily_briefing,
     client_draft_reply,
 )
+from jarvis.tools.cost_tools import (
+    get_cost_today,
+    get_cost_month,
+)
 
 
 @dataclass
@@ -1594,6 +1598,28 @@ _TOOL_DEFS: list[ToolDef] = [
             },
             "required": ["client_name", "platform", "inquiry_or_context"],
         },
+    ),
+
+    # ── get_cost_today ────────────────────────────────────────────────────────
+    ToolDef(
+        name="get_cost_today",
+        fn=get_cost_today,
+        description=(
+            "Get the total tokens and estimated USD spending for today. "
+            "Returns a breakdown of model queries, transcription, and speech synthesis costs."
+        ),
+        parameters={"type": "object", "properties": {}},
+    ),
+
+    # ── get_cost_month ────────────────────────────────────────────────────────
+    ToolDef(
+        name="get_cost_month",
+        fn=get_cost_month,
+        description=(
+            "Get the total tokens and estimated USD spending for the current month. "
+            "Returns a breakdown of monthly spending against the monthly budget limit."
+        ),
+        parameters={"type": "object", "properties": {}},
     ),
 ]
 

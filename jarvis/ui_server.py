@@ -53,6 +53,21 @@ async def _handler(ws: WebSocketServerProtocol) -> None:
     try:
         # Send current state so the page syncs immediately on reconnect
         await ws.send('{"type":"state","state":"idle"}')
+        try:
+            import json
+            from jarvis.cost.tracker import get_cost_today, get_cost_month
+            td = get_cost_today()
+            mo = get_cost_month()
+            cost_event = json.dumps({
+                "type": "cost",
+                "today": f"${td['total_cost']:.2f}",
+                "month": f"${mo['total_cost']:.2f}",
+                "today_cost": td["total_cost"],
+                "month_cost": mo["total_cost"],
+            })
+            await ws.send(cost_event)
+        except Exception:
+            pass
         # Keep connection open — we don't process inbound messages
         # (UI is display-only; ignore anything the browser sends)
         async for _ in ws:

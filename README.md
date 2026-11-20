@@ -35,6 +35,7 @@ Jarvis is a private, voice-controlled desktop AI agent built for Linux laptops. 
 - **Server Monitoring & DevOps**: SSH server telemetry, background site/SSL/error watcher with proactive voice alerts, remote log inspection, and guarded artisan/composer deployment tool.
 - **Security Reconnaissance & Server Defense**: Scope-enforced security recon for authorized domains and IPs, subdomain enumeration, DNS/SPF/DMARC auditing, rate-limited port scanning, exposed `.env` and `.git` detection, Laravel vulnerability audits, SSH/Nginx log defense, and permission-gated firewall IP blocking.
 - **Personal Assistant (Productivity Suite)**: Gmail integration (read, summarize, draft, send with mandatory draft read-aloud and spoken confirmation), Google Calendar schedule listing and natural language event creation, 10-minute proactive voice reminders, SQLite-persistent reminders & timers across restarts, morning daily briefing (*"good morning Jarvis"*), client message drafting (Fiverr/Upwork) in customized tones, and OAuth 2.0 local token protection (0600 permissions, never logged).
+- **Cost Tracking & Spending Limits**: Real-time token and cost counting for model completions, Whisper transcription, and TTS speech output. Persistent SQLite storage (`data/cost.db`) aggregated daily and monthly. Voice inquiries (*"how much have I spent today"*, *"how much this month"*), 80% voice warning alerts, 100% automatic downgrade to `gpt-4o-mini`, expensive action spoken confirmation gates, running HUD cost display in the UI, and absolute zero API key logging security invariant.
 
 ---
 
@@ -500,3 +501,58 @@ PYTHONPATH=. ./venv/bin/python tests/test_personal_assistant.py
 - [ ] **Client Messages**: Verified tone selection and strict invariant preventing automatic sending.
 - [ ] **Daemon Watcher**: Verified background assistant thread starts and stops gracefully.
 - [ ] **Tool Risk Classification**: Verified `gmail_send_email` is `NEEDS_CONFIRMATION` in `CENTRAL_TOOL_RISK_TABLE` and query tools are `SAFE`.
+
+---
+
+## Cost Tracking & Spending Limits Suite
+
+Jarvis features an automated, real-time cost tracking engine that calculates tokens and dollar expenditures across all model queries, Whisper speech-to-text transcriptions, and OpenAI TTS voice generations.
+
+### Key Capabilities & Invariants
+
+| Feature | Description |
+| :--- | :--- |
+| **Comprehensive Accounting** | Tracks prompt tokens, completion tokens, audio duration, and TTS character counts, computing USD costs based on official pricing tables. |
+| **Local SQLite Persistence** | Saves all granular cost events and daily/monthly rolling aggregates to `data/cost.db`. Survives restarts and system crashes. |
+| **Natural Voice Inquiries** | Ask *"how much have I spent today"* or *"how much this month"*. Returns an immediate concise spoken reply and structured markdown breakdown. |
+| **80% Voice Warning** | When current spending reaches 80% of daily or monthly limit, Jarvis warns you aloud once per budget period (*"Alamin, you have reached 80% of your daily spending limit..."*). |
+| **100% Hard Limit Protection** | When spending reaches 100% of budget: <br>1. **Model Downgrade**: Automatically forces model selection to `gpt-4o-mini`.<br>2. **Confirmation Gate**: Before executing expensive tools (`take_screenshot`, `fix_screen_error`, `describe_screen`, `recon_full_scan`, `server_deploy`, `laravel_debug_and_fix`), Jarvis asks for spoken confirmation. |
+| **Live HUD Running Cost Display** | Displays running daily and monthly expenditures in a dedicated corner badge (`#cost-panel`) in the desktop UI, synced in real-time over WebSocket. |
+| **Zero API Key Logging Invariant** | OpenAI API keys (`sk-...`) are sanitized and stripped from all database tables, error messages, and log files. |
+
+### Configuration (`config/cost_config.yaml`)
+
+Budget limits and model rates can be tailored in `config/cost_config.yaml` or overridden via environment variables (`JARVIS_DAILY_LIMIT_USD`, `JARVIS_MONTHLY_LIMIT_USD`):
+
+```yaml
+cost:
+  daily_limit_usd: 1.00      # Daily budget limit in USD
+  monthly_limit_usd: 30.00   # Monthly budget limit in USD
+  warning_threshold: 0.80    # 80% threshold for voice warning
+  hard_limit_threshold: 1.00 # 100% threshold for hard limit
+  cheaper_model: "gpt-4o-mini"
+  expensive_tools:
+    - "take_screenshot"
+    - "fix_screen_error"
+    - "describe_screen"
+    - "recon_full_scan"
+    - "server_deploy"
+    - "laravel_debug_and_fix"
+```
+
+### Cost Tracking Test Checklist
+
+Run the complete cost tracking test suite:
+```bash
+PYTHONPATH=. ./venv/bin/python tests/test_cost_tracking.py
+```
+
+- [ ] **Accurate Cost Mathematics**: Verified pricing formulas for `gpt-4o`, `gpt-4o-mini`, `whisper-1`, and `tts-1`.
+- [ ] **Database Persistence**: Verified granular event storage and daily/monthly accumulation in `data/cost.db`.
+- [ ] **Voice Commands**: Verified regex and spoken replies for *"how much have I spent today"* and *"how much this month"*.
+- [ ] **80% Voice Warning**: Verified threshold warning triggers and alerts deduplication to avoid audio spam.
+- [ ] **100% Model Downgrade**: Verified automatic switch to `gpt-4o-mini` in `model_router.py`.
+- [ ] **Expensive Action Gate**: Verified spoken confirmation is enforced before running costly tools at 100% budget.
+- [ ] **Real-Time UI Display**: Verified WebSocket `cost` event emission and HTML HUD display.
+- [ ] **API Key Security**: Verified API keys (`sk-...`) are strictly scrubbed and never logged or persisted.
+- [ ] **Tool Registry Integration**: Verified `get_cost_today` and `get_cost_month` are registered as `SAFE` in Central Risk Table.

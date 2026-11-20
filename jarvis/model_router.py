@@ -63,6 +63,20 @@ def select_model(user_text: str) -> tuple[str, str]:
     fast_model = get("models.fast_model", "gpt-4o-mini")
     strong_model = get("models.strong_model", "gpt-4o")
 
+    # ── Spending Limit Enforcement (100% hard limit) ────────────────────────
+    try:
+        from jarvis.cost.tracker import is_hard_limit_reached
+        from jarvis.cost.config import get_cheaper_model
+        if is_hard_limit_reached():
+            cheaper = get_cheaper_model()
+            logger.warning(
+                f"Model router: Spending limit reached (100%). "
+                f"Switching model to cheaper model '{cheaper}'."
+            )
+            return cheaper, "cost_limit_cheaper_model"
+    except Exception as exc:
+        logger.debug(f"[Model Router] Cost check error: {exc}")
+
     if strategy == "fast":
         return fast_model, "forced_fast"
     if strategy == "strong":

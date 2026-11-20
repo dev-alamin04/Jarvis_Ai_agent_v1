@@ -153,6 +153,13 @@ class StreamingTTSPlayer:
                 break
 
             try:
+                # Track estimated cost for spoken sentence
+                try:
+                    from jarvis.cost.tracker import track_speech
+                    track_speech(text_or_chars=sentence, model=TTS_MODEL)
+                except Exception as exc:
+                    logger.debug(f"[Cost Tracking] Streaming speech tracking error: {exc}")
+
                 # Generate raw PCM directly from OpenAI TTS
                 response = self._client.audio.speech.create(
                     model=TTS_MODEL,

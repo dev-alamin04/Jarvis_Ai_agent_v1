@@ -109,6 +109,12 @@ def speak(text: str) -> None:
     logger.info(f"TTS: {text[:80]!r}…")
 
     try:
+        from jarvis.cost.tracker import track_speech
+        track_speech(text_or_chars=text, model=TTS_MODEL)
+    except Exception as exc:
+        logger.debug(f"[Cost Tracking] Speech tracking error: {exc}")
+
+    try:
         client = _get_client()
         # Request raw PCM (f32le) so we don't need an mp3 decoder
         response = client.audio.speech.create(

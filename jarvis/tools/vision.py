@@ -40,6 +40,20 @@ def _ensure_display_env():
         pass
 
 
+def _track_vision_usage(response: Any, model: str = "gpt-4o") -> None:
+    """Record token usage and estimated cost for vision model calls."""
+    try:
+        if hasattr(response, "usage") and response.usage:
+            from jarvis.cost.tracker import track_model_call
+            track_model_call(
+                model=model,
+                prompt_tokens=response.usage.prompt_tokens,
+                completion_tokens=response.usage.completion_tokens,
+            )
+    except Exception:
+        pass
+
+
 def capture_screen_image(target: str = "screen", region: dict | None = None) -> Image.Image:
     """
     Capture the screen or a region into a PIL Image in memory.
@@ -153,6 +167,7 @@ def take_screenshot(
             ],
             max_tokens=600,
         )
+        _track_vision_usage(response, model="gpt-4o")
         return response.choices[0].message.content or "(no response from vision model)"
     except Exception as exc:
         logger.error(f"Vision API error: {exc}")
@@ -204,6 +219,7 @@ def locate_element(description: str) -> dict[str, Any]:
             ],
             max_tokens=200,
         )
+        _track_vision_usage(response, model="gpt-4o")
         content = (response.choices[0].message.content or "").strip()
         # Clean json backticks if any
         content = re.sub(r"^```(?:json)?\s*", "", content, flags=re.I)
@@ -268,6 +284,7 @@ def fix_screen_error(extra_context: str = "") -> str:
             ],
             max_tokens=800,
         )
+        _track_vision_usage(response, model="gpt-4o")
         content = (response.choices[0].message.content or "").strip()
         content = re.sub(r"^```(?:json)?\s*", "", content, flags=re.I)
         content = re.sub(r"\s*```$", "", content)
