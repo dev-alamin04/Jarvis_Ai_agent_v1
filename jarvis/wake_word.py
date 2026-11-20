@@ -43,6 +43,8 @@ from jarvis.vad import SpeechCollector
 # ── Config ────────────────────────────────────────────────────────────────────
 _WAKE_WORD: str = get("wake_word.word", "hey jarvis")
 _SENSITIVITY: float = float(get("wake_word.sensitivity", 0.5))
+_DEBUG_SCORE: bool = bool(get("wake_word.debug_score", True))
+_INPUT_DEVICE = get("audio.input_device", None)
 _SAMPLE_RATE: int = 16_000          # OWW requires 16 kHz
 _CHANNELS: int = 1
 _DTYPE: str = "int16"
@@ -170,6 +172,7 @@ class WakeWordListener:
             channels=_CHANNELS,
             dtype=_DTYPE,
             blocksize=_CHUNK_SAMPLES,
+            device=_INPUT_DEVICE,
             callback=self._audio_callback,
         ):
             logger.info("Microphone open — listening for wake word…")
@@ -177,8 +180,8 @@ class WakeWordListener:
 
     def _detection_loop(self) -> None:
         """Read chunks, run OWW inference, trigger on detection."""
-        # Keep a sliding window of the last ~1 s of audio for OWW
-        oww_buffer: list[np.ndarray] = []
+        model_key = _WAKE_WORD.lower().strip()
+        oww_name = _OWW_MODEL_MAP.get(model_key, "hey_jarvis")
 
         while not audio_state.shutdown.is_set():
             try:
@@ -187,23 +190,23 @@ class WakeWordListener:
                 continue
 
             chunk = np.frombuffer(raw, dtype=np.int16)
-            oww_buffer.append(chunk)
 
             if self._oww_model is None:
                 # Stub mode: skip OWW, never trigger automatically
                 continue
 
-            # OWW needs chunks fed as float32 normalised
-            audio_f32 = chunk.astype(np.float32) / 32768.0
-
+            # Pass int16 numpy array directly to openWakeWord
             try:
-                prediction = self._oww_model.predict(audio_f32)
+                prediction = self._oww_model.predict(chunk)
             except Exception as exc:
-                logger.debug(f"OWW predict error: {exc}")
+                logger.error(f"OWW predict error: {exc}")
                 continue
 
-            # prediction is {model_name: score}
-            score = max(prediction.values()) if prediction else 0.0
+            # Get score for target wake word
+            score = float(prediction.get(oww_name, 0.0))
+
+            if _DEBUG_SCORE and score > 0.1:
+                logger.info(f"[OWW DEBUG] {oww_name} score: {score:.3f} (threshold: {_SENSITIVITY})")
 
             if score >= _SENSITIVITY:
                 self._handle_detection()
@@ -229,6 +232,13 @@ class WakeWordListener:
             except Exception as exc:
                 logger.debug(f"on_activated callback error: {exc}")
 
+        # Flush again after beep playback finishes
+        while not self._pcm_queue.empty():
+            try:
+                self._pcm_queue.get_nowait()
+            except queue.Empty:
+                break
+
         # Record command with VAD
         audio_state.recording.set()
         command_audio = self._record_command()
@@ -240,6 +250,16 @@ class WakeWordListener:
             self._on_wake(command_audio)
         else:
             logger.info("Wake word triggered but no speech detected — returning to listen.")
+
+        # Flush stale audio and reset model buffers before resuming wake word listening
+        while not self._pcm_queue.empty():
+            try:
+                self._pcm_queue.get_nowait()
+            except queue.Empty:
+                break
+
+        if self._oww_model:
+            self._oww_model.reset()
 
     def _record_command(self) -> bytes | None:
         """
