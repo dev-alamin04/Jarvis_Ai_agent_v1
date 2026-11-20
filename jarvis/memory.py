@@ -196,7 +196,10 @@ class LongTermMemory:
             self.db_path = Path(db_path)
 
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._lock = threading.Lock()
+        # Use RLock so the same thread can re-acquire (e.g. laravel/context.py
+        # grabs _lock from outside while another method on the same thread already
+        # holds it, which would deadlock a plain Lock).
+        self._lock = threading.RLock()
         self._init_db()
         self._seed_initial_facts()
 
