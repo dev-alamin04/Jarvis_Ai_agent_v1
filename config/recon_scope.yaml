@@ -1,0 +1,51 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Jarvis Security Reconnaissance & Defense Scope Configuration
+#
+# IMPORTANT SECURITY POLICY:
+# Every security recon and audit tool MUST check the target against this
+# scope file first and REFUSE anything outside it, saying so out loud.
+#
+# THE AGENT CAN NEVER EDIT THIS FILE BY ITSELF. ONLY THE USER (ALAMIN)
+# CAN EDIT THIS FILE BY HAND.
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+version: 1
+updated_at: "2026-11-20"
+authorized_by: "Alamin"
+
+# Authorized domains & wildcards
+domains:
+  - "localhost"
+  - "127.0.0.1"
+  - "mrym.example.com"
+  - "*.mrym.example.com"
+  - "ibrahimcheikh.example.com"
+  - "*.ibrahimcheikh.example.com"
+  - "*.local"
+  - "*.internal"
+
+# Authorized IP ranges (CIDR notation)
+ip_ranges:
+  - "127.0.0.0/8"         # Local loopback
+  - "192.168.1.0/24"      # Local development and home lab subnet
+  - "10.0.0.0/24"         # Private testing network
+
+# Explicitly authorized web applications
+apps:
+  mrym_laravel:
+    name: "mrym_laravel"
+    url: "https://mrym.example.com"
+    server: "cloudpanel_prod"
+    type: "laravel"
+
+  ibrahimcheikh:
+    name: "ibrahimcheikh"
+    url: "https://ibrahimcheikh.example.com"
+    server: "do_vps"
+    type: "laravel"
+
+  local_dev:
+    name: "local_dev"
+    url: "http://127.0.0.1:8000"
+    server: "localhost"
+    type: "laravel"

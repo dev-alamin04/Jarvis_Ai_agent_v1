@@ -18,6 +18,9 @@ env/
 logs/*.log
 logs/*.jsonl
 
+# ── Recon Reports ────────────────────────────────
+reports/recon/*.md
+
 # ── Local data ─────────────────────────────────────
 data/*.db
 data/*.db-journal

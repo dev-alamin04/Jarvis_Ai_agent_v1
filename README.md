@@ -366,3 +366,69 @@ PYTHONPATH=. ./venv/bin/python tests/test_devops_monitoring.py
 - [ ] **DevOps Permission Gate**: Verified read-only bypass, service restart approval, and exact command announcement for destructive actions.
 - [ ] **Background Watcher**: Verified HTTP downtime detection, SSL certificate expiry warning, new error detection, and proactive voice alerts.
 - [ ] **Audit Log & Tamper Chain**: Verified logging to `logs/remote_commands.log` and integrity of cryptographic hash chain.
+
+---
+
+## Security Reconnaissance & Defense Mode
+
+Jarvis includes a dedicated security reconnaissance and defensive audit system for authorized targets, user-owned servers, and authorized bug bounty scope.
+
+### Core Policy & Scope Invariant
+- **Authorized Scope File (`config/recon_scope.yaml`)**:
+  - Lists allowed domains, wildcards (`*.mrym.example.com`), and IP CIDR ranges (`127.0.0.0/8`, `192.168.1.0/24`).
+  - **Every security tool checks the target against this scope file first**.
+  - **Strict Refusal**: Any target outside the scope is immediately refused and announced out loud (*"Target ... is outside authorized scope. Scanning is refused."*).
+  - **Agent Immutability**: The agent can **never** edit the scope file. Only the user can edit it by hand.
+- **Rules of Engagement**:
+  - No exploitation, no brute forcing, no denial of service, and no scanning of out-of-scope targets.
+  - Trusted CLI commands are displayed verbatim before execution (`nmap`, `subfinder`, `httpx`, `nuclei`, `dig`).
+
+### Reconnaissance Tools
+
+1. **Subdomain Discovery (`recon_subdomains`)**:
+   - Discovers active subdomains using passive Certificate Transparency (`crt.sh`) and `subfinder -d <domain> -silent`.
+2. **DNS Records & Mail Security (`recon_dns_records`)**:
+   - Resolves A, AAAA, MX, TXT, NS, CNAME, and audits SPF (`v=spf1`) and DMARC policy records to prevent email spoofing.
+3. **HTTP Headers & Tech Stack (`recon_http_headers`)**:
+   - Detects web servers, PHP/Laravel frameworks, and checks for missing security headers: HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy.
+4. **Rate-Limited Port Scanner (`recon_port_scan`)**:
+   - Scans safe common ports (21, 22, 25, 53, 80, 443, 3306, 5432, 6379, 8000, 8080, 8443) with rate limiting (`nmap -sT -T3 --max-rate 50` or throttled socket). Flags dangerously exposed databases.
+5. **Sensitive Exposed Files Probe (`recon_exposed_files`)**:
+   - Probes for publicly accessible sensitive files (`/.env`, `/.git/HEAD`, `/.git/config`, `database.sqlite`, `laravel.log`, `.bak`) with cryptographic signature matching to prevent false positives.
+6. **Laravel Deep Security Audit (`recon_laravel_audit`)**:
+   - Verifies:
+     - Debug mode status (`APP_DEBUG=true` / Ignition / Whoops stack trace leaks)
+     - Publicly exposed Telescope (`/telescope`) or Horizon (`/horizon`) dashboards
+     - Unsafe CORS policies (wildcard origins with credentials or arbitrary origin reflection)
+     - Outdated dependencies and known CVEs in `composer.lock`
+7. **Consolidated Full Recon Scan (`recon_full_scan`)**:
+   - Runs multi-stage recon and generates a consolidated Markdown audit report saved to `reports/recon/recon_<target>_<timestamp>.md` with a concise voice summary.
+
+### Server Defense Mode
+
+1. **Hostile Log Inspection (`recon_server_defense_audit`)**:
+   - Analyzes `/var/log/auth.log` and `/var/log/nginx/access.log` on remote servers.
+   - Detects repeated failed SSH logins (brute-forcing) and aggressive path scanning (probing `.env`, `wp-login`, `phpmyadmin`).
+2. **Firewall IP Blocking (`recon_block_ip`)**:
+   - Proposes blocking hostile IPs via `sudo ufw deny from <IP> to any`.
+   - **Permission Gate**: Blocking strictly requires user **spoken confirmation** before any firewall rule is applied.
+
+### Security Recon Test Checklist
+
+Run the automated security reconnaissance test suite:
+```bash
+PYTHONPATH=. ./venv/bin/python tests/test_security_recon.py
+```
+
+- [ ] **Scope Refusal**: Verified that out-of-scope targets (`google.com`, `bank.com`, `8.8.8.8`) are strictly refused with spoken message.
+- [ ] **Scope Immutability**: Verified that agent attempts to modify `config/recon_scope.yaml` are blocked.
+- [ ] **Subdomain Discovery**: Verified Certificate Transparency and subfinder enumeration.
+- [ ] **DNS & Email Security**: Verified record parsing and SPF/DMARC gap detection.
+- [ ] **HTTP Headers**: Verified missing HSTS, CSP, and X-Frame-Options detection.
+- [ ] **Port Scan Rate Limits**: Verified safe `--max-rate 50` rate limiting and exposed DB detection.
+- [ ] **Exposed Files**: Verified `.env` and `.git` signature verification.
+- [ ] **Laravel Audit**: Verified debug mode, Telescope/Horizon, CORS, and `composer.lock` CVE checks.
+- [ ] **Markdown Report**: Verified report saved to `reports/recon/` and spoken summary brevity.
+- [ ] **Server Defense**: Verified SSH brute force and web scanning detection.
+- [ ] **Firewall Blocking**: Verified spoken confirmation gate blocks unauthorized firewall changes.
+- [ ] **Audit Trail**: Verified logging to `logs/security_recon.log` and tamper-evident hash chain.

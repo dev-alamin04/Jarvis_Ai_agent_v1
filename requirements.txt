@@ -35,3 +35,6 @@ pyperclip>=1.8.2           # system clipboard read/write
 
 # ── Unified Messaging ────────────────────────────────────────────────────────
 playwright>=1.40.0         # browser automation with persistent profiles
+
+# ── Security Recon & Defense ─────────────────────────────────────────────
+dnspython>=2.4.0           # DNS record resolution and mail security audit

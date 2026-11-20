@@ -70,6 +70,18 @@ from jarvis.tools.devops_tools import (
     server_run_remote_command,
     server_list_sites,
 )
+from jarvis.tools.recon_tools import (
+    recon_subdomains,
+    recon_dns_records,
+    recon_http_headers,
+    recon_port_scan,
+    recon_exposed_files,
+    recon_nuclei_scan,
+    recon_laravel_audit,
+    recon_full_scan,
+    recon_server_defense_audit,
+    recon_block_ip,
+)
 
 
 @dataclass
@@ -1135,6 +1147,208 @@ _TOOL_DEFS: list[ToolDef] = [
                     "description": "Optional server name to filter websites by.",
                 },
             },
+        },
+    ),
+
+    # ── recon_subdomains ─────────────────────────────────────────────────────
+    ToolDef(
+        name="recon_subdomains",
+        fn=recon_subdomains,
+        description="Discover active subdomains for an authorized domain using Certificate Transparency and subfinder. Refuses out-of-scope targets.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "description": "Authorized domain name to enumerate subdomains for (e.g. 'mrym.example.com').",
+                },
+            },
+            "required": ["domain"],
+        },
+    ),
+
+    # ── recon_dns_records ────────────────────────────────────────────────────
+    ToolDef(
+        name="recon_dns_records",
+        fn=recon_dns_records,
+        description="Resolve DNS records (A, AAAA, MX, TXT, NS, CNAME) and audit SPF/DMARC mail security for an authorized domain. Refuses out-of-scope targets.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "description": "Authorized domain name to resolve DNS records for.",
+                },
+            },
+            "required": ["domain"],
+        },
+    ),
+
+    # ── recon_http_headers ───────────────────────────────────────────────────
+    ToolDef(
+        name="recon_http_headers",
+        fn=recon_http_headers,
+        description="Inspect HTTP response headers, detect web technologies, and check for missing security headers (HSTS, CSP, X-Frame-Options). Refuses out-of-scope targets.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "description": "Authorized target URL or hostname (e.g. 'https://mrym.example.com').",
+                },
+            },
+            "required": ["target"],
+        },
+    ),
+
+    # ── recon_port_scan ──────────────────────────────────────────────────────
+    ToolDef(
+        name="recon_port_scan",
+        fn=recon_port_scan,
+        description="Run a safe, rate-limited TCP port scan against an authorized target and identify open services and exposed databases. Refuses out-of-scope targets.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "description": "Authorized target hostname or IP address.",
+                },
+                "ports": {
+                    "type": "string",
+                    "description": "Optional comma-separated list of ports to scan (e.g. '80,443,3306,8080'). Defaults to safe common ports.",
+                },
+            },
+            "required": ["target"],
+        },
+    ),
+
+    # ── recon_exposed_files ──────────────────────────────────────────────────
+    ToolDef(
+        name="recon_exposed_files",
+        fn=recon_exposed_files,
+        description="Perform non-destructive checks for exposed sensitive files (.env, .git, backups, database dumps, logs) on an authorized target. Refuses out-of-scope targets.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "description": "Authorized target URL or hostname.",
+                },
+            },
+            "required": ["target"],
+        },
+    ),
+
+    # ── recon_nuclei_scan ────────────────────────────────────────────────────
+    ToolDef(
+        name="recon_nuclei_scan",
+        fn=recon_nuclei_scan,
+        description="Run safe, non-intrusive misconfiguration and exposure templates using Nuclei against an authorized target. Refuses out-of-scope targets.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "description": "Authorized target URL or hostname.",
+                },
+                "tags": {
+                    "type": "string",
+                    "description": "Template tags to execute (default 'misconfig,exposure').",
+                },
+            },
+            "required": ["target"],
+        },
+    ),
+
+    # ── recon_laravel_audit ──────────────────────────────────────────────────
+    ToolDef(
+        name="recon_laravel_audit",
+        fn=recon_laravel_audit,
+        description="Perform deep security audit of an authorized Laravel application: debug mode, exposed Telescope/Horizon, unsafe CORS, and vulnerable composer.lock dependencies. Refuses out-of-scope targets.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "description": "Authorized target URL or hostname.",
+                },
+                "project_path": {
+                    "type": "string",
+                    "description": "Optional local project path to inspect composer.lock.",
+                },
+            },
+            "required": ["target"],
+        },
+    ),
+
+    # ── recon_full_scan ──────────────────────────────────────────────────────
+    ToolDef(
+        name="recon_full_scan",
+        fn=recon_full_scan,
+        description="Run a complete consolidated security reconnaissance scan (subdomains, DNS, headers, ports, exposed files, Laravel audit) and generate a markdown report. Refuses out-of-scope targets.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "description": "Authorized target URL or hostname.",
+                },
+                "ports": {
+                    "type": "string",
+                    "description": "Optional comma-separated ports for port scan.",
+                },
+                "project_path": {
+                    "type": "string",
+                    "description": "Optional project path to audit composer.lock.",
+                },
+            },
+            "required": ["target"],
+        },
+    ),
+
+    # ── recon_server_defense_audit ───────────────────────────────────────────
+    ToolDef(
+        name="recon_server_defense_audit",
+        fn=recon_server_defense_audit,
+        description="Defense mode: Inspect auth.log and nginx access.log on an authorized server, detect failed login brute forcing and malicious web scanning, and propose blocking offending IPs.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "server_name": {
+                    "type": "string",
+                    "description": "Server name from config/servers.yaml (e.g. 'cloudpanel_prod', 'do_vps').",
+                },
+                "lines": {
+                    "type": "integer",
+                    "description": "Number of log lines to inspect (default 500).",
+                },
+            },
+            "required": ["server_name"],
+        },
+    ),
+
+    # ── recon_block_ip ───────────────────────────────────────────────────────
+    ToolDef(
+        name="recon_block_ip",
+        fn=recon_block_ip,
+        description="Defense mode: Block a malicious IP address on a remote server using firewall rules (ufw/iptables). Requires spoken confirmation before execution.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "server_name": {
+                    "type": "string",
+                    "description": "Server name from config/servers.yaml.",
+                },
+                "ip_address": {
+                    "type": "string",
+                    "description": "Malicious IPv4 address to block.",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for the firewall block (e.g. 'Repeated failed SSH logins').",
+                },
+            },
+            "required": ["server_name", "ip_address"],
         },
     ),
 ]
