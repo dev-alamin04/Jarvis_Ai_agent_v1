@@ -37,6 +37,8 @@ Jarvis is a private, voice-controlled desktop AI agent built for Linux laptops. 
 - **Personal Assistant (Productivity Suite)**: Gmail integration (read, summarize, draft, send with mandatory draft read-aloud and spoken confirmation), Google Calendar schedule listing and natural language event creation, 10-minute proactive voice reminders, SQLite-persistent reminders & timers across restarts, morning daily briefing (*"good morning Jarvis"*), client message drafting (Fiverr/Upwork) in customized tones, and OAuth 2.0 local token protection (0600 permissions, never logged).
 - **Cost Tracking & Spending Limits**: Real-time token and cost counting for model completions, Whisper transcription, and TTS speech output. Persistent SQLite storage (`data/cost.db`) aggregated daily and monthly. Voice inquiries (*"how much have I spent today"*, *"how much this month"*), 80% voice warning alerts, 100% automatic downgrade to `gpt-4o-mini`, expensive action spoken confirmation gates, running HUD cost display in the UI, and absolute zero API key logging security invariant.
 - **Automated Multi-Step Routines**: Trigger sequential tool workflows using custom or starter voice phrases: *"work mode"*, *"end of day"*, and *"server check"*. Create new routines naturally by voice (*"make a routine called study mode that opens..."*). Strict security invariant: Jarvis reads the steps back aloud and saves only after your spoken confirmation, and every step is executed strictly through the Permission Gate.
+- **Cost Tracking & Spending Limits**: Real-time token and cost counting for model completions, Whisper transcription, and TTS speech output. Persistent SQLite storage (`data/cost.db`) aggregated daily and monthly. Voice inquiries (*"how much have I spent today"*, *"how much this month"*), 80% voice warning alerts, 100% automatic downgrade to `gpt-4o-mini`, expensive action spoken confirmation gates, running HUD cost display in the UI, and absolute zero API key logging security invariant.
+- **Automated Multi-Step Routines**: Trigger sequential tool workflows using custom or starter voice phrases: *"work mode"*, *"end of day"*, and *"server check"*. Create new routines naturally by voice (*"make a routine called study mode that opens..."*). Strict security invariant: Jarvis reads the steps back aloud and saves only after your spoken confirmation, and every step is executed strictly through the Permission Gate.
 
 ---
 
@@ -502,6 +504,114 @@ PYTHONPATH=. ./venv/bin/python tests/test_personal_assistant.py
 - [ ] **Client Messages**: Verified tone selection and strict invariant preventing automatic sending.
 - [ ] **Daemon Watcher**: Verified background assistant thread starts and stops gracefully.
 - [ ] **Tool Risk Classification**: Verified `gmail_send_email` is `NEEDS_CONFIRMATION` in `CENTRAL_TOOL_RISK_TABLE` and query tools are `SAFE`.
+
+---
+
+## Cost Tracking & Spending Limits Suite
+
+Jarvis features an automated, real-time cost tracking engine that calculates tokens and dollar expenditures across all model queries, Whisper speech-to-text transcriptions, and OpenAI TTS voice generations.
+
+### Key Capabilities & Invariants
+
+| Feature | Description |
+| :--- | :--- |
+| **Comprehensive Accounting** | Tracks prompt tokens, completion tokens, audio duration, and TTS character counts, computing USD costs based on official pricing tables. |
+| **Local SQLite Persistence** | Saves all granular cost events and daily/monthly rolling aggregates to `data/cost.db`. Survives restarts and system crashes. |
+| **Natural Voice Inquiries** | Ask *"how much have I spent today"* or *"how much this month"*. Returns an immediate concise spoken reply and structured markdown breakdown. |
+| **80% Voice Warning** | When current spending reaches 80% of daily or monthly limit, Jarvis warns you aloud once per budget period (*"Alamin, you have reached 80% of your daily spending limit..."*). |
+| **100% Hard Limit Protection** | When spending reaches 100% of budget: <br>1. **Model Downgrade**: Automatically forces model selection to `gpt-4o-mini`.<br>2. **Confirmation Gate**: Before executing expensive tools (`take_screenshot`, `fix_screen_error`, `describe_screen`, `recon_full_scan`, `server_deploy`, `laravel_debug_and_fix`), Jarvis asks for spoken confirmation. |
+| **Live HUD Running Cost Display** | Displays running daily and monthly expenditures in a dedicated corner badge (`#cost-panel`) in the desktop UI, synced in real-time over WebSocket. |
+| **Zero API Key Logging Invariant** | OpenAI API keys (`sk-...`) are sanitized and stripped from all database tables, error messages, and log files. |
+
+### Configuration (`config/cost_config.yaml`)
+
+Budget limits and model rates can be tailored in `config/cost_config.yaml` or overridden via environment variables (`JARVIS_DAILY_LIMIT_USD`, `JARVIS_MONTHLY_LIMIT_USD`):
+
+```yaml
+cost:
+  daily_limit_usd: 1.00      # Daily budget limit in USD
+  monthly_limit_usd: 30.00   # Monthly budget limit in USD
+  warning_threshold: 0.80    # 80% threshold for voice warning
+  hard_limit_threshold: 1.00 # 100% threshold for hard limit
+  cheaper_model: "gpt-4o-mini"
+  expensive_tools:
+    - "take_screenshot"
+    - "fix_screen_error"
+    - "describe_screen"
+    - "recon_full_scan"
+    - "server_deploy"
+    - "laravel_debug_and_fix"
+```
+
+### Cost Tracking Test Checklist
+
+Run the complete cost tracking test suite:
+```bash
+PYTHONPATH=. ./venv/bin/python tests/test_cost_tracking.py
+```
+
+- [ ] **Accurate Cost Mathematics**: Verified pricing formulas for `gpt-4o`, `gpt-4o-mini`, `whisper-1`, and `tts-1`.
+- [ ] **Database Persistence**: Verified granular event storage and daily/monthly accumulation in `data/cost.db`.
+- [ ] **Voice Commands**: Verified regex and spoken replies for *"how much have I spent today"* and *"how much this month"*.
+- [ ] **80% Voice Warning**: Verified threshold warning triggers and alerts deduplication to avoid audio spam.
+- [ ] **100% Model Downgrade**: Verified automatic switch to `gpt-4o-mini` in `model_router.py`.
+- [ ] **Expensive Action Gate**: Verified spoken confirmation is enforced before running costly tools at 100% budget.
+- [ ] **Real-Time UI Display**: Verified WebSocket `cost` event emission and HTML HUD display.
+- [ ] **API Key Security**: Verified API keys (`sk-...`) are strictly scrubbed and never logged or persisted.
+- [ ] **Tool Registry Integration**: Verified `get_cost_today` and `get_cost_month` are registered as `SAFE` in Central Risk Table.
+
+---
+
+## Automated Routines Suite
+
+Jarvis supports multi-step automated routines, enabling a single voice phrase to execute a chained sequence of tools and shell operations.
+
+### Starter Routines
+
+| Routine Name | Voice Trigger Phrases | Automated Action Steps |
+| :--- | :--- | :--- |
+| **Work Mode** | *"Work mode"*, *"start work"*, *"enter work mode"* | 1. Open VS Code on active Laravel project (`open_app`).<br>2. Start Laravel dev server in background (`run_shell_command`).<br>3. Open browser to local site `http://127.0.0.1:8000` (`browser_open`). |
+| **End of Day** | *"End of day"*, *"wrap up"*, *"finish work for today"* | 1. Show git status of active project (`laravel_git_status`).<br>2. Review pending reminders & tasks to commit (`list_reminders`).<br>3. Stop local development servers (`run_shell_command`).<br>4. Summarize today's activities and spending (`get_cost_today`). |
+| **Server Check** | *"Server check"*, *"check servers"*, *"check all servers"* | Connects via SSH to all configured servers in `config/servers.yaml` (`cloudpanel_prod`, `do_vps`, `hostinger_vps`), gathers disk, RAM, CPU load, uptime, and system services, and presents a spoken summary. |
+
+### Voice Routine Creation & Mandatory Readback Gate
+
+You can create new routines naturally by voice:
+> *"Hey Jarvis, make a routine called study mode that opens Chrome to https://google.com and plays YouTube lofi beats."*
+
+**Security Invariant & Readback Gate**:
+1. Jarvis analyzes your request and translates it into tool operations.
+2. Jarvis **MUST** read the steps back aloud before anything is saved:
+   > *"Create routine 'Study Mode' with 2 steps: Step 1: Open browser to https://google.com, Step 2: Play YouTube lofi beats. Shall I save this routine?"*
+3. Jarvis waits for your spoken **"yes"**.
+   - If you say "no", routine creation is aborted immediately.
+   - If you say "yes", it is saved to `config/routines.yaml` and becomes immediately usable by voice (*"start study mode"*).
+
+### Permission Gate Guarantee
+
+> [!IMPORTANT]
+> **Zero Gate Bypass**:
+> Every single step of a routine is executed through `_execute_tool()`, which enforces:
+> - Safety Layer context validation
+> - Cost limits check
+> - **Permission Gate check**: Any destructive action (deleting files, force pushes, sensitive UI clicks, sudo actions) still requires explicit user spoken approval during routine execution.
+> - A routine can **never** contain flags or instructions that skip or bypass the Permission Gate.
+
+### Routines Test Checklist
+
+Run the complete routines test suite:
+```bash
+PYTHONPATH=. ./venv/bin/python tests/test_routines.py
+```
+
+- [ ] **Configuration Loading**: Verified starter routines (`work_mode`, `end_of_day`, `server_check`) loaded from `config/routines.yaml`.
+- [ ] **Voice Trigger Matching**: Verified matching of direct and colloquial trigger phrases.
+- [ ] **Dynamic Parameter Substitution**: Verified `{active_project_path}` resolves to the active project.
+- [ ] **Sequential Execution**: Verified all steps run in order through the tool execution pipeline.
+- [ ] **Voice Creation Parsing**: Verified conversion of natural phrases into tool definitions.
+- [ ] **Readback & Confirmation Gate**: Verified steps read aloud and routine discarded if user denies.
+- [ ] **Permission Gate Invariant**: Verified restricted tools trigger gates and cannot be bypassed.
+- [ ] **Tool Registry Integration**: Verified `run_routine`, `list_routines`, and `create_routine` registered.
 
 ---
 

@@ -239,7 +239,10 @@ def check_upcoming_event_reminders(
                 spoken_msg = f"Alamin, you have '{ev['summary']}' starting in 10 minutes at {time_display}."
                 logger.info(f"[Calendar Reminder] 10-minute alert: {spoken_msg}")
 
-                if speak_fn:
+                from jarvis.focus.manager import is_focus_active
+                if is_focus_active():
+                    logger.info(f"[Calendar Reminder] Focus mode active - staying quiet: {spoken_msg}")
+                elif speak_fn:
                     try:
                         speak_fn(spoken_msg)
                     except Exception:

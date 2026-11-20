@@ -73,12 +73,20 @@ def transcribe(pcm_bytes: bytes, sample_rate: int = 16_000) -> str:
         logger.debug(f"[Cost Tracking] Transcription tracking error: {exc}")
 
     try:
+        from jarvis.german.state import get_stt_language, get_stt_prompt
+        stt_lang = get_stt_language()
+        stt_prompt = get_stt_prompt()
+    except Exception:
+        stt_lang = "en"
+        stt_prompt = "Voice command for Jarvis desktop assistant."
+
+    try:
         client = _get_client()
         result = client.audio.transcriptions.create(
             model=TRANSCRIPTION_MODEL,
             file=wav_buf,
-            language="en",
-            prompt="Voice command for Jarvis desktop assistant.",
+            language=stt_lang,
+            prompt=stt_prompt,
             temperature=0.0,
         )
         text = result.text.strip()

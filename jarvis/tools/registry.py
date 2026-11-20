@@ -104,6 +104,17 @@ from jarvis.tools.routine_tools import (
     list_routines,
     create_routine,
 )
+from jarvis.tools.focus_tools import (
+    start_focus_mode,
+    stop_focus_mode,
+    get_focus_summary,
+)
+from jarvis.tools.german_tools import (
+    start_german_practice,
+    stop_german_practice,
+    get_german_quiz,
+    get_german_study_summary,
+)
 
 
 @dataclass
@@ -1677,6 +1688,72 @@ _TOOL_DEFS: list[ToolDef] = [
             },
             "required": ["name", "steps_description"],
         },
+    ),
+
+    # ── Focus Mode Tools ──────────────────────────────────────────────────────
+    ToolDef(
+        name="start_focus_mode",
+        fn=start_focus_mode,
+        description=(
+            "Start a timed focus mode session (default 45 minutes). "
+            "Mutes desktop notifications and keeps quiet except for urgent server alerts."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "duration_minutes": {
+                    "type": "integer",
+                    "description": "Duration of focus session in minutes (default: 45).",
+                    "default": 45,
+                },
+            },
+        },
+    ),
+
+    ToolDef(
+        name="stop_focus_mode",
+        fn=stop_focus_mode,
+        description="Stop the active focus mode session early and restore desktop notifications.",
+        parameters={"type": "object", "properties": {}},
+    ),
+
+    ToolDef(
+        name="get_focus_summary",
+        fn=get_focus_summary,
+        description="Get a summary of focus mode sessions and total focus minutes completed today.",
+        parameters={"type": "object", "properties": {}},
+    ),
+
+    # ── German Study Companion Tools ──────────────────────────────────────────
+    ToolDef(
+        name="start_german_practice",
+        fn=start_german_practice,
+        description=(
+            "Start an interactive German conversation practice session at B1 level. "
+            "Switches speech recognition (STT) and voice output (TTS) to German."
+        ),
+        parameters={"type": "object", "properties": {}},
+    ),
+
+    ToolDef(
+        name="stop_german_practice",
+        fn=stop_german_practice,
+        description="End the German practice session and return language mode to English.",
+        parameters={"type": "object", "properties": {}},
+    ),
+
+    ToolDef(
+        name="get_german_quiz",
+        fn=get_german_quiz,
+        description="Generate a quick quiz question based on learned B1 vocabulary and recorded grammar mistakes.",
+        parameters={"type": "object", "properties": {}},
+    ),
+
+    ToolDef(
+        name="get_german_study_summary",
+        fn=get_german_study_summary,
+        description="Get a summary of learned German B1 vocabulary words and recorded grammar tips.",
+        parameters={"type": "object", "properties": {}},
     ),
 ]
 
