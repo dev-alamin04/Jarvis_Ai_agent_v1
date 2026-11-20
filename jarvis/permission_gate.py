@@ -48,6 +48,7 @@ _DANGEROUS_SHELL_PATTERNS: list[re.Pattern] = [
 # Tools that are always dangerous regardless of arguments
 _ALWAYS_DANGEROUS_TOOLS: set[str] = {
     "delete_file",
+    "delete_files",
     "overwrite_file",
 }
 
@@ -64,6 +65,20 @@ _ALWAYS_SAFE_TOOLS: set[str] = {
     "recall_facts",
     "get_project_context",
     "set_project_context",
+    # Vision & Screen tools
+    "take_screenshot",
+    "fix_screen_error",
+    # File search & Clipboard tools
+    "search_files",
+    "read_clipboard",
+    "write_clipboard",
+    # Browser safe navigation
+    "browser_open",
+    "browser_search",
+    # Mouse & Keyboard non-sensitive controls
+    "scroll_screen",
+    "type_text",
+    "press_hotkey",
 }
 
 
@@ -185,6 +200,38 @@ def check(tool_name: str, args: dict, speak_fn=None) -> None:
         reason = f"it will delete stored memories matching `{query}`"
         _handle_dangerous(tool_name, args, reason, speak_fn)
         return
+
+    # 8. Mouse clicks in sensitive applications (password managers, banking, terminals running sudo)
+    if tool_name in ("click_at", "click_element"):
+        desc = str(args.get("description", ""))
+        app_name = str(args.get("app_name", ""))
+        sensitive = False
+        detail = ""
+        try:
+            from jarvis.tools.computer import is_sensitive_context
+            sensitive, detail = is_sensitive_context(description=desc, app_name=app_name)
+        except Exception as exc:
+            logger.debug(f"is_sensitive_context check error: {exc}")
+
+        if sensitive:
+            reason = f"clicking inside a sensitive application or privileged terminal ({detail})"
+            _handle_dangerous(tool_name, args, reason, speak_fn)
+            return
+
+    # 9. Moving many files (>3 files) requires confirmation
+    if tool_name == "move_files":
+        sources = args.get("sources", [])
+        if len(sources) > 3:
+            reason = f"moving {len(sources)} files (bulk file operation)"
+            _handle_dangerous(tool_name, args, reason, speak_fn)
+            return
+
+    # 10. Submitting forms requires confirmation
+    if tool_name == "browser_fill_form":
+        if args.get("submit", False) is True:
+            reason = "submitting a web form"
+            _handle_dangerous(tool_name, args, reason, speak_fn)
+            return
 
 
 def _handle_dangerous(tool_name: str, args: dict, reason: str, speak_fn) -> None:

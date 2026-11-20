@@ -22,6 +22,25 @@ from jarvis.tools.memory_tools import (
     set_project_context,
     get_project_context,
 )
+from jarvis.tools.vision import take_screenshot, fix_screen_error
+from jarvis.tools.computer import (
+    click_at,
+    click_element,
+    type_text,
+    press_hotkey,
+    scroll_screen,
+)
+from jarvis.tools.files import (
+    search_files,
+    move_files,
+    read_clipboard,
+    write_clipboard,
+)
+from jarvis.tools.browser import (
+    browser_open,
+    browser_search,
+    browser_fill_form,
+)
 
 
 @dataclass
@@ -233,6 +252,333 @@ _TOOL_DEFS: list[ToolDef] = [
         parameters={
             "type": "object",
             "properties": {},
+        },
+    ),
+
+    # ── take_screenshot ──────────────────────────────────────────────────────
+    ToolDef(
+        name="take_screenshot",
+        fn=take_screenshot,
+        description=(
+            "Capture the screen (or active window) and send it to the vision model (gpt-4o) "
+            "to describe what is on screen, read an error or text, or find a button or UI element. "
+            "The screenshot is held in memory and never saved to disk unless explicitly asked."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "What to look for, read, or describe from the screenshot.",
+                },
+                "target": {
+                    "type": "string",
+                    "enum": ["screen", "window"],
+                    "description": "'screen' for the full desktop, or 'window' for the active window.",
+                },
+                "save_to_disk": {
+                    "type": "boolean",
+                    "description": "Set to true ONLY if the user explicitly requested saving the image to disk.",
+                },
+                "file_path": {
+                    "type": "string",
+                    "description": "Optional file path where to save if save_to_disk is true.",
+                },
+            },
+        },
+    ),
+
+    # ── fix_screen_error ─────────────────────────────────────────────────────
+    ToolDef(
+        name="fix_screen_error",
+        fn=fix_screen_error,
+        description=(
+            "Analyze an error, exception, or traceback currently visible on the screen. "
+            "Automatically captures the screen, extracts error messages and file paths/lines, "
+            "inspects the local code files, and proposes a concrete fix. "
+            "Use this whenever the user says 'fix this error' or refers to an error on screen."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "extra_context": {
+                    "type": "string",
+                    "description": "Optional user context or description of what they were trying to do.",
+                },
+            },
+        },
+    ),
+
+    # ── click_at ─────────────────────────────────────────────────────────────
+    ToolDef(
+        name="click_at",
+        fn=click_at,
+        description=(
+            "Click the mouse at specific (x, y) pixel coordinates on the screen. "
+            "Clicking inside sensitive apps (password managers, banking, terminals running sudo) "
+            "requires user confirmation."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "integer",
+                    "description": "X coordinate in pixels (0 is left).",
+                },
+                "y": {
+                    "type": "integer",
+                    "description": "Y coordinate in pixels (0 is top).",
+                },
+                "clicks": {
+                    "type": "integer",
+                    "description": "Number of clicks (1 for single, 2 for double). Default 1.",
+                },
+                "button": {
+                    "type": "string",
+                    "enum": ["left", "right", "middle"],
+                    "description": "Mouse button to click. Default 'left'.",
+                },
+            },
+            "required": ["x", "y"],
+        },
+    ),
+
+    # ── click_element ────────────────────────────────────────────────────────
+    ToolDef(
+        name="click_element",
+        fn=click_element,
+        description=(
+            "Find a UI element by visual description using screen vision and click it. "
+            "Example descriptions: 'the blue Submit button', 'the search bar', 'the terminal window'. "
+            "Clicking inside sensitive apps requires user confirmation."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "description": "Natural language description of the button, input, or element to click.",
+                },
+            },
+            "required": ["description"],
+        },
+    ),
+
+    # ── type_text ────────────────────────────────────────────────────────────
+    ToolDef(
+        name="type_text",
+        fn=type_text,
+        description=(
+            "Type text into the currently active or focused desktop window or input element. "
+            "Supports full Unicode, multi-line text, and pressing Enter."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The text string to type into the active window.",
+                },
+                "press_enter": {
+                    "type": "boolean",
+                    "description": "Whether to press Enter after typing the text (default false).",
+                },
+            },
+            "required": ["text"],
+        },
+    ),
+
+    # ── press_hotkey ─────────────────────────────────────────────────────────
+    ToolDef(
+        name="press_hotkey",
+        fn=press_hotkey,
+        description=(
+            "Press a keyboard key or hotkey combination (e.g. 'ctrl+c', 'ctrl+v', 'alt+tab', 'super')."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "keys": {
+                    "type": "string",
+                    "description": "Hotkey string such as 'ctrl+c', 'ctrl+shift+t', 'alt+tab', or 'escape'.",
+                },
+            },
+            "required": ["keys"],
+        },
+    ),
+
+    # ── scroll_screen ────────────────────────────────────────────────────────
+    ToolDef(
+        name="scroll_screen",
+        fn=scroll_screen,
+        description=(
+            "Scroll the active screen, page, or window up or down."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "clicks": {
+                    "type": "integer",
+                    "description": "Number of scroll clicks/units (default 3).",
+                },
+                "direction": {
+                    "type": "string",
+                    "enum": ["down", "up"],
+                    "description": "Scroll direction: 'down' or 'up'. Default 'down'.",
+                },
+            },
+        },
+    ),
+
+    # ── search_files ─────────────────────────────────────────────────────────
+    ToolDef(
+        name="search_files",
+        fn=search_files,
+        description=(
+            "Search for files by name/glob pattern, or search inside file contents (like grep). "
+            "Useful for finding source code, configuration files, notes, or error references."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Filename pattern (e.g. '*.py', 'docker*') or text string to grep for.",
+                },
+                "directory": {
+                    "type": "string",
+                    "description": "Optional directory to search in (defaults to active project or workspace).",
+                },
+                "search_content": {
+                    "type": "boolean",
+                    "description": "If true, search inside file contents (grep). If false, search filenames.",
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximum number of results to return (default 20).",
+                },
+            },
+            "required": ["query"],
+        },
+    ),
+
+    # ── move_files ───────────────────────────────────────────────────────────
+    ToolDef(
+        name="move_files",
+        fn=move_files,
+        description=(
+            "Move or organize files into a destination folder. "
+            "Moving more than 3 files at once requires user confirmation."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "sources": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of source file or directory paths to move.",
+                },
+                "destination": {
+                    "type": "string",
+                    "description": "Destination directory path.",
+                },
+                "create_dest": {
+                    "type": "boolean",
+                    "description": "Whether to create destination folder if it does not exist (default true).",
+                },
+            },
+            "required": ["sources", "destination"],
+        },
+    ),
+
+    # ── read_clipboard ───────────────────────────────────────────────────────
+    ToolDef(
+        name="read_clipboard",
+        fn=read_clipboard,
+        description="Read the current text content from the system clipboard.",
+        parameters={
+            "type": "object",
+            "properties": {},
+        },
+    ),
+
+    # ── write_clipboard ──────────────────────────────────────────────────────
+    ToolDef(
+        name="write_clipboard",
+        fn=write_clipboard,
+        description="Copy text to the system clipboard.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The text to copy to clipboard.",
+                },
+            },
+            "required": ["text"],
+        },
+    ),
+
+    # ── browser_open ─────────────────────────────────────────────────────────
+    ToolDef(
+        name="browser_open",
+        fn=browser_open,
+        description="Open a web URL in the system default web browser.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "The full website URL to open (must start with http:// or https://).",
+                },
+            },
+            "required": ["url"],
+        },
+    ),
+
+    # ── browser_search ───────────────────────────────────────────────────────
+    ToolDef(
+        name="browser_search",
+        fn=browser_search,
+        description="Search Google, DuckDuckGo, or Bing and open the results in the browser.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search query or topic.",
+                },
+                "engine": {
+                    "type": "string",
+                    "enum": ["google", "duckduckgo", "bing"],
+                    "description": "Search engine to use (default 'google').",
+                },
+            },
+            "required": ["query"],
+        },
+    ),
+
+    # ── browser_fill_form ────────────────────────────────────────────────────
+    ToolDef(
+        name="browser_fill_form",
+        fn=browser_fill_form,
+        description=(
+            "Fill out simple form inputs in the active browser window. "
+            "Submitting forms (submit=true) requires user spoken confirmation."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "fields": {
+                    "type": "object",
+                    "description": "Key-value dictionary mapping field names or labels to their values.",
+                },
+                "submit": {
+                    "type": "boolean",
+                    "description": "Whether to submit the form after filling. Requires confirmation.",
+                },
+            },
+            "required": ["fields"],
         },
     ),
 ]

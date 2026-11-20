@@ -31,6 +31,17 @@ _DEFAULT_COMPLEX_KEYWORDS = [
     "database",
     "bug",
     "stack trace",
+    "screen",
+    "screenshot",
+    "vision",
+    "look",
+    "see",
+    "click",
+    "type",
+    "mouse",
+    "hotkey",
+    "press",
+    "form",
 ]
 
 

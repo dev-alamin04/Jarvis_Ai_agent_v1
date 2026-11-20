@@ -26,3 +26,9 @@ Pillow>=10.0.0             # tray icon generation
 
 # ── Media Tools ──────────────────────────────────────────────────────────────
 yt-dlp>=2024.0.0           # YouTube video search and ID retrieval
+
+# ── Vision & Computer Control ────────────────────────────────────────────────
+mss>=9.0.0                 # fast in-memory screen capture
+pyautogui>=0.9.54          # mouse and keyboard automation
+python-xlib>=0.33          # X11/Xwayland interface for pyautogui
+pyperclip>=1.8.2           # system clipboard read/write

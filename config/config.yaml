@@ -28,6 +28,17 @@ models:
     - "review"
     - "laravel"
     - "docker"
+    - "screen"
+    - "screenshot"
+    - "vision"
+    - "look"
+    - "see"
+    - "click"
+    - "type"
+    - "mouse"
+    - "hotkey"
+    - "press"
+    - "form"
 
 audio:
   sample_rate: 16000
