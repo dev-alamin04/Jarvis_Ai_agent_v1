@@ -1,0 +1,77 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Jarvis DevOps & Server Monitoring Configuration
+#
+# IMPORTANT SECURITY INVARIANT:
+# Secrets (passwords, private SSH key bytes, tokens) stay in files outside
+# the repository (e.g. ~/.ssh/id_rsa), NEVER in memory or logs.
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+servers:
+  cloudpanel_prod:
+    name: "cloudpanel_prod"
+    host: "127.0.0.1"             # Remote IP or hostname
+    user: "root"
+    port: 22
+    key_path: "~/.ssh/id_rsa"     # Path to SSH key file outside repo
+    type: "CloudPanel"            # CloudPanel | DigitalOcean | Hostinger VPS | Ubuntu
+    services:
+      - "nginx"
+      - "php8.2-fpm"
+      - "mysql"
+      - "redis"
+    backup_dir: "/home/cloudpanel/backups"
+
+  do_vps:
+    name: "do_vps"
+    host: "127.0.0.1"
+    user: "ubuntu"
+    port: 22
+    key_path: "~/.ssh/id_ed25519"
+    type: "DigitalOcean"
+    services:
+      - "nginx"
+      - "php8.3-fpm"
+      - "mysql"
+      - "redis"
+    backup_dir: "/var/backups"
+
+  hostinger_vps:
+    name: "hostinger_vps"
+    host: "127.0.0.1"
+    user: "root"
+    port: 22
+    key_path: "~/.ssh/id_rsa"
+    type: "Hostinger VPS"
+    services:
+      - "nginx"
+      - "php8.2-fpm"
+      - "mysql"
+    backup_dir: "/backup"
+
+websites:
+  mrym_laravel:
+    name: "mrym_laravel"
+    url: "https://mrym.example.com"
+    server: "cloudpanel_prod"
+    project_path: "/home/cloudpanel/htdocs/mrym_laravel"
+    type: "laravel"
+    ssl_days_threshold: 14
+    laravel_log_path: "/home/cloudpanel/htdocs/mrym_laravel/storage/logs/laravel.log"
+    nginx_log_path: "/var/log/nginx/error.log"
+
+  ibrahimcheikh:
+    name: "ibrahimcheikh"
+    url: "https://ibrahimcheikh.example.com"
+    server: "do_vps"
+    project_path: "/var/www/ibrahimcheikh_laravel"
+    type: "laravel"
+    ssl_days_threshold: 14
+    laravel_log_path: "/var/www/ibrahimcheikh_laravel/storage/logs/laravel.log"
+    nginx_log_path: "/var/log/nginx/error.log"
+
+watcher:
+  enabled: true
+  interval_seconds: 180           # Check every 3 minutes
+  owner_name: "Alamin"            # Owner name addressed in spoken alerts
+  ssl_warning_days: 14            # Warn when SSL expires in <= 14 days
+  alert_cooldown_seconds: 600     # Suppress duplicate alerts for 10 minutes

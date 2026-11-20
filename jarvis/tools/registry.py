@@ -61,6 +61,15 @@ from jarvis.tools.laravel_tools import (
     laravel_scaffold,
     laravel_code_review,
 )
+from jarvis.tools.devops_tools import (
+    server_health_check,
+    server_analyze_logs,
+    server_deploy,
+    server_check_backups,
+    server_restart_service,
+    server_run_remote_command,
+    server_list_sites,
+)
 
 
 @dataclass
@@ -973,6 +982,157 @@ _TOOL_DEFS: list[ToolDef] = [
                 "file_path": {
                     "type": "string",
                     "description": "Optional specific file to limit review to.",
+                },
+            },
+        },
+    ),
+
+    # ── server_health_check ──────────────────────────────────────────────────
+    ToolDef(
+        name="server_health_check",
+        fn=server_health_check,
+        description="Connect to a remote server over SSH and report disk usage, RAM, CPU load, uptime, and the status of system services (nginx, PHP-FPM, MySQL, Redis, queue workers, Docker).",
+        parameters={
+            "type": "object",
+            "properties": {
+                "server_name": {
+                    "type": "string",
+                    "description": "Name or alias of the server (e.g. 'cloudpanel_prod', 'do_vps', 'hostinger_vps').",
+                },
+            },
+            "required": ["server_name"],
+        },
+    ),
+
+    # ── server_analyze_logs ──────────────────────────────────────────────────
+    ToolDef(
+        name="server_analyze_logs",
+        fn=server_analyze_logs,
+        description="Read recent logs on a remote server (Laravel, nginx error/access, syslog), summarize errors, and suggest fixes.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "server_name": {
+                    "type": "string",
+                    "description": "Target server name (e.g. 'cloudpanel_prod', 'do_vps').",
+                },
+                "log_type": {
+                    "type": "string",
+                    "enum": ["laravel", "nginx", "syslog", "daemon"],
+                    "description": "Type of log to inspect (default 'laravel').",
+                },
+                "lines": {
+                    "type": "integer",
+                    "description": "Number of recent lines to tail and inspect (default 50).",
+                },
+                "project_name": {
+                    "type": "string",
+                    "description": "Optional website/project name to locate laravel.log (e.g. 'mrym_laravel').",
+                },
+            },
+            "required": ["server_name"],
+        },
+    ),
+
+    # ── server_deploy ────────────────────────────────────────────────────────
+    ToolDef(
+        name="server_deploy",
+        fn=server_deploy,
+        description="Run a step-by-step deployment on a remote server: git pull, composer install, pre-migration DB backup, php artisan migrate, cache clear, and queue restart. Requires spoken confirmation.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "server_name": {
+                    "type": "string",
+                    "description": "Target server name (e.g. 'cloudpanel_prod', 'do_vps').",
+                },
+                "project_name": {
+                    "type": "string",
+                    "description": "Name of the website/project to deploy (e.g. 'mrym_laravel', 'ibrahimcheikh').",
+                },
+                "branch": {
+                    "type": "string",
+                    "description": "Git branch to pull and deploy (default 'main').",
+                },
+            },
+            "required": ["server_name", "project_name"],
+        },
+    ),
+
+    # ── server_check_backups ─────────────────────────────────────────────────
+    ToolDef(
+        name="server_check_backups",
+        fn=server_check_backups,
+        description="Check whether recent backups exist on a remote server, their age, file sizes, and staleness status.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "server_name": {
+                    "type": "string",
+                    "description": "Target server name (e.g. 'cloudpanel_prod', 'do_vps').",
+                },
+                "backup_dir": {
+                    "type": "string",
+                    "description": "Optional custom backup directory to inspect (defaults to server's configured backup directory).",
+                },
+            },
+            "required": ["server_name"],
+        },
+    ),
+
+    # ── server_restart_service ───────────────────────────────────────────────
+    ToolDef(
+        name="server_restart_service",
+        fn=server_restart_service,
+        description="Restart a system service (nginx, php8.2-fpm, mysql, redis, etc.) on a remote server. Requires spoken confirmation.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "server_name": {
+                    "type": "string",
+                    "description": "Target server name (e.g. 'cloudpanel_prod', 'do_vps').",
+                },
+                "service": {
+                    "type": "string",
+                    "description": "Name of the service to restart (e.g. 'nginx', 'php8.2-fpm', 'mysql', 'redis').",
+                },
+            },
+            "required": ["server_name", "service"],
+        },
+    ),
+
+    # ── server_run_remote_command ────────────────────────────────────────────
+    ToolDef(
+        name="server_run_remote_command",
+        fn=server_run_remote_command,
+        description="Execute a shell command on a remote server over SSH. Read-only commands run freely; state-changing or sudo commands require spoken confirmation; destructive commands (rm, drop database, ufw) require the exact command read aloud first.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "server_name": {
+                    "type": "string",
+                    "description": "Target server name (e.g. 'cloudpanel_prod', 'do_vps').",
+                },
+                "command": {
+                    "type": "string",
+                    "description": "Exact shell command to execute remotely.",
+                },
+            },
+            "required": ["server_name", "command"],
+        },
+    ),
+
+    # ── server_list_sites ────────────────────────────────────────────────────
+    ToolDef(
+        name="server_list_sites",
+        fn=server_list_sites,
+        description="List all configured servers, types, IP addresses, and hosted websites with their live URLs.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "server_name": {
+                    "type": "string",
+                    "description": "Optional server name to filter websites by.",
                 },
             },
         },
