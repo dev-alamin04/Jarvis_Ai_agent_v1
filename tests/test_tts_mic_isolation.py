@@ -227,3 +227,15 @@ class TestTTSMicIsolation:
         mock_stt.return_value = "yes I approve"
         _on_command_received(b"\x00\x00" * 8000)
         mock_brain.assert_not_called()
+
+    @patch("jarvis.voice_agent.transcribe", return_value="improve the UI feature")
+    @patch("jarvis.self_update.handle_improve_feature_voice", return_value="Proposal ready")
+    @patch("jarvis.voice_agent.speak")
+    def test_improve_feature_voice_command_invokes_handler_without_unbound_local_error(
+        self, mock_speak, mock_handle, mock_stt
+    ):
+        # Must execute cleanly without UnboundLocalError
+        _on_command_received(b"\x00\x00" * 8000)
+        mock_handle.assert_called_once()
+        assert mock_handle.call_args[1]["feature_name"] == "ui"
+        assert callable(mock_handle.call_args[1]["speak_fn"])
