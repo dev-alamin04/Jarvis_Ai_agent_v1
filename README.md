@@ -31,6 +31,7 @@ Jarvis is a private, voice-controlled desktop AI agent built for Linux laptops. 
 - **Unified Multi-Platform Messaging**: Send messages on **WhatsApp**, **Facebook Messenger**, and **Telegram** using your own logged-in browser sessions.
 - **Laravel Developer Assistant**: Voice-activated assistant for Laravel 10/11 & Pest/PHPUnit: autonomous debug & patch loop, test runner, git automation, automatic database backups before destructive migrations, table schema inspection, artisan scaffolding, and 4-pillar code review. Strict security barrier blocking `.env` access.
 - **Defense-in-Depth Safety Layer**: Non-bypassable safety boundary wrapping the permission gate: untrusted external data fencing (`<<<UNTRUSTED_EXTERNAL_DATA>>>`), second-check validating tool calls against voice intent, central tool risk table, exact command read-aloud, argument taint tracking, cryptographic SHA-256 tamper-evident audit chain, and spoken panic command (*"Jarvis, stop everything"*).
+- **Self-Review & Improve-a-Feature System**: Dual-branch autonomous improvement cycle (`stable` and `candidate`): voice commands *"review yourself"* and *"improve the <feature> feature"*, candidate-only patch application, test scoring, trial runs with automatic rollback on failure, permanent lock on security files, and mandatory spoken merge approval.
 
 ---
 
@@ -231,3 +232,54 @@ PYTHONPATH=. ./venv/bin/python tests/test_safety_layer.py
 - [ ] **Command Read-Aloud**: Dangerous actions read verbatim command before confirmation.
 - [ ] **Tamper-Evident Chain**: Hash chain integrity validates; simulated tampering is caught.
 - [ ] **Panic Mode**: *"Jarvis, stop everything"* mutes mic, locks read-only mode, and resumes on command.
+
+---
+
+## Self-Review & Improve-a-Feature System
+
+Jarvis can autonomously review its own codebase, detect architectural weaknesses, and improve features using a dual-branch git lifecycle (**`stable`** and **`candidate`**).
+
+### Key Workflow Rules
+
+1. **Two Git Branches**:
+   - `stable`: The production branch where Jarvis runs daily.
+   - `candidate`: The staging branch where all feature improvements are implemented and tested.
+   - **Changes are NEVER applied directly to `stable`**.
+2. **Locked Security Invariants**:
+   - The following critical files are permanently locked and **can never be modified by the agent**, even on `candidate`:
+     - `jarvis/permission_gate.py` (Permission Gate)
+     - `jarvis/config.py` & `config/config.yaml` (Protected-paths list & configuration)
+     - `jarvis/safety.py` (Safety Layer)
+     - `jarvis/self_update.py` (Self-Update Controller)
+     - `data/locked_files.json` (Lock list and cryptographic hash registry)
+   - **Startup Integrity Check**: Jarvis recalculates SHA-256 hashes of all locked files at startup and **refuses to run** if any locked file was modified without approval.
+3. **Voice Command: `"review yourself"`**:
+   - Scans 50+ modules across the codebase, verifies security boundaries, runs test suites, checks latency, and speaks a concise 3-sentence summary of findings and improvement opportunities.
+   - Logs the detailed audit report to `logs/self_review.log`.
+4. **Voice Command: `"improve the <feature> feature"`**:
+   - Reads the feature's code and tests, explains its current abilities and gaps, and proposes an actionable plan.
+   - **Waits for spoken "yes"** before touching any code.
+   - Checks out `candidate`, applies changes, runs syntax checks (`py_compile`) and test suites, and reports a score:
+     > *"Candidate Score: 7 tests passing before -> 9 tests passing after. New abilities: Tag-based fact filtering, memory confidence decay."*
+   - Starts the candidate version in a trial subprocess for verification.
+   - **Automatic Rollback**: If the candidate fails to start or crashes, Jarvis automatically rolls back to the last stable commit.
+   - **Mandatory Spoken Approval**: If the candidate starts successfully, Jarvis asks:
+     > *"Candidate version is running and verified with 9 tests. Do you approve merging this candidate into the stable branch?"*
+     Only upon your spoken **"yes"**, candidate is fast-forward merged into `stable` and restarts on `stable`. If rejected, candidate changes are discarded.
+5. **Comprehensive Audit Logging**:
+   - Every review, proposal, approval, and rejection is persistently logged to `logs/self_update.log` and mirrored to the tamper-evident hash chain.
+
+### Self-Update Test Checklist
+
+Run the automated self-review & self-update test suite:
+```bash
+PYTHONPATH=. ./venv/bin/python tests/test_self_update.py
+```
+- [ ] **Locked Files Blocked**: Verified agent cannot edit locked files via tools, shell commands, or patches.
+- [ ] **Startup Hash Check**: Verified startup refuses to run if any locked file was tampered with.
+- [ ] **Self-Review Voice Command**: Verified codebase scanning, invariant audit, and spoken summary.
+- [ ] **Improve-a-Feature Proposal**: Verified abilities/gaps analysis and proposal cancellation on "no".
+- [ ] **Candidate Isolation**: Verified changes are applied strictly on `candidate`, never on `stable`.
+- [ ] **Auto-Rollback on Crash**: Verified candidate startup failure reverts automatically to stable commit.
+- [ ] **Explicit Merge Approval**: Verified candidate merges into stable only upon explicit spoken "yes".
+- [ ] **Audit Logging**: Verified persistent records in `logs/self_update.log`.
