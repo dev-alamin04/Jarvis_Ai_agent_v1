@@ -25,7 +25,10 @@ from jarvis.vad import VADFramer
 
 _SAMPLE_RATE = 24_000   # OpenAI TTS PCM output is 24 kHz
 _client: OpenAI | None = None
-_INTERRUPT_KEYWORDS = {"stop", "quiet", "hush", "shut up", "silence", "pause", "cancel"}
+_INTERRUPT_KEYWORDS = {
+    "stop", "quiet", "hush", "shut up", "silence", "pause", "cancel",
+    "hey jarvis", "jarvis", "wait", "enough"
+}
 
 
 def _interrupt_monitor(stop_event: threading.Event) -> None:

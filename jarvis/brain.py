@@ -14,12 +14,17 @@ from __future__ import annotations
 
 import json
 import os
+import time
 
 from openai import OpenAI
 
 from jarvis import config
+from jarvis.beep import tool_start_chime
 from jarvis.logger import action_log, logger
+from jarvis.model_router import select_model
 from jarvis.permission_gate import check as gate_check, PermissionDenied
+from jarvis.streaming_tts import SentenceSplitter, StreamingTTSPlayer
+from jarvis.timing import current_timing
 from jarvis.tools import TOOL_REGISTRY, get_tool_schemas
 
 # ── OpenAI client (key comes from env, never hardcoded) ───────────────────────
@@ -61,9 +66,10 @@ def process_turn(
     user_text: str,
     conversation_history: list[dict],
     speak_fn=None,
+    stream_to_voice: bool = True,
 ) -> str:
     """
-    Run one full conversation turn.
+    Run one full conversation turn using model streaming for minimum latency.
 
     Parameters
     ----------
@@ -72,15 +78,21 @@ def process_turn(
     conversation_history : list[dict]
         Running message list (mutated in place for multi-turn context).
     speak_fn : callable | None
-        If provided, voice output function used by the permission gate.
+        If provided and stream_to_voice is False, used for final speech.
+    stream_to_voice : bool
+        If True, sentences are streamed to TTS the moment they form.
 
     Returns
     -------
     str
-        The model's final text reply (to be spoken or printed).
+        The model's final text reply.
     """
     client = _get_client()
     tools = get_tool_schemas()
+
+    # Model routing: pick fast model vs strong model
+    chosen_model, route_reason = select_model(user_text)
+    current_timing.model_used = chosen_model
 
     # Append user message
     conversation_history.append({"role": "user", "content": user_text})
@@ -93,43 +105,120 @@ def process_turn(
         dynamic_system_prompt += f"\n\nContext & Memories:\n{mem_context}"
 
     for iteration in range(config.MAX_TOOL_ITERATIONS):
-        logger.info(f"Brain iteration {iteration + 1}")
+        logger.info(f"Brain iteration {iteration + 1} (model: {chosen_model})")
 
-        response = client.chat.completions.create(
-            model=config.OPENAI_MODEL,
-            messages=[{"role": "system", "content": dynamic_system_prompt}] + conversation_history,
-            tools=tools,
-            tool_choice="auto",
-        )
+        # Set up streaming TTS player if voice streaming is active and not already handled
+        tts_player = None
+        if stream_to_voice and speak_fn is not None:
+            tts_player = StreamingTTSPlayer(client=client, speak_callback=speak_fn)
+            tts_player.start()
 
-        message = response.choices[0].message
+        splitter = SentenceSplitter()
+        accumulated_content: list[str] = []
+        raw_tool_calls: dict[int, dict] = {}
+        chimed_for_tools = False
 
-        # ── No tool call: model is done ───────────────────────────────────
-        if not message.tool_calls:
-            reply = message.content or "(no reply)"
-            conversation_history.append({"role": "assistant", "content": reply})
-            memory_manager.short_term.set_messages(conversation_history)
-            return reply
+        try:
+            stream = client.chat.completions.create(
+                model=chosen_model,
+                messages=[{"role": "system", "content": dynamic_system_prompt}] + conversation_history,
+                tools=tools,
+                tool_choice="auto",
+                stream=True,
+            )
 
-        # ── Append the assistant's tool-call message ──────────────────────
-        conversation_history.append(message.model_dump(exclude_unset=True))
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
 
-        # ── Execute each tool call ────────────────────────────────────────
-        for tc in message.tool_calls:
-            tool_name = tc.function.name
-            try:
-                args = json.loads(tc.function.arguments)
-            except json.JSONDecodeError:
-                args = {}
+                # ── Tool Calls streaming ──────────────────────────────────
+                if delta.tool_calls:
+                    if not chimed_for_tools:
+                        chimed_for_tools = True
+                        # Abort any accidental speech and play immediate tool chime
+                        if tts_player:
+                            tts_player.abort()
+                            tts_player = None
+                        tool_start_chime()
 
-            tool_result = _execute_tool(tool_name, args, speak_fn)
+                    for tc in delta.tool_calls:
+                        idx = tc.index
+                        if idx not in raw_tool_calls:
+                            raw_tool_calls[idx] = {
+                                "id": tc.id or "",
+                                "type": "function",
+                                "function": {"name": "", "arguments": ""},
+                            }
+                        if tc.id:
+                            raw_tool_calls[idx]["id"] = tc.id
+                        if tc.function:
+                            if tc.function.name:
+                                raw_tool_calls[idx]["function"]["name"] += tc.function.name
+                            if tc.function.arguments:
+                                raw_tool_calls[idx]["function"]["arguments"] += tc.function.arguments
 
-            # Append tool result message
-            conversation_history.append({
-                "role": "tool",
-                "tool_call_id": tc.id,
-                "content": tool_result,
-            })
+                # ── Content streaming ─────────────────────────────────────
+                elif delta.content:
+                    current_timing.mark_first_token()
+                    text_piece = delta.content
+                    accumulated_content.append(text_piece)
+
+                    if tts_player:
+                        ready_sentences = splitter.feed(text_piece)
+                        for sentence in ready_sentences:
+                            tts_player.feed_sentence(sentence)
+
+        except Exception as exc:
+            logger.error(f"Stream error: {exc}")
+            if tts_player:
+                tts_player.abort()
+            raise
+
+        # ── Handle Tool Execution if tools were called ────────────────────
+        if raw_tool_calls:
+            if tts_player:
+                tts_player.abort()
+                tts_player = None
+
+            tool_calls_list = [raw_tool_calls[i] for i in sorted(raw_tool_calls.keys())]
+            assistant_msg = {
+                "role": "assistant",
+                "content": "".join(accumulated_content) or None,
+                "tool_calls": tool_calls_list,
+            }
+            conversation_history.append(assistant_msg)
+
+            for tc in tool_calls_list:
+                tool_name = tc["function"]["name"]
+                current_timing.tools_called.append(tool_name)
+                try:
+                    args = json.loads(tc["function"]["arguments"])
+                except json.JSONDecodeError:
+                    args = {}
+
+                tool_result = _execute_tool(tool_name, args, speak_fn)
+                conversation_history.append({
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": tool_result,
+                })
+            # Loop continues to next iteration for model's spoken reply
+            continue
+
+        # ── Finish conversational reply ───────────────────────────────────
+        full_reply = "".join(accumulated_content).strip() or "(no reply)"
+
+        if tts_player:
+            # Feed remaining text and wait for playback
+            rem_sentences = splitter.finish()
+            for s in rem_sentences:
+                tts_player.feed_sentence(s)
+            tts_player.finish()
+
+        conversation_history.append({"role": "assistant", "content": full_reply})
+        memory_manager.short_term.set_messages(conversation_history)
+        return full_reply
 
     # Hit iteration limit
     fallback = "I reached the maximum number of tool calls for this request. Please try a simpler command."

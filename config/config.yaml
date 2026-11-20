@@ -8,6 +8,27 @@ openai:
   tts_voice: "echo"           # alloy | echo | fable | onyx | nova | shimmer
   max_tool_iterations: 6      # max tool calls per conversation turn
 
+pipeline:
+  mode: "streaming"           # streaming (low-latency sentence-level TTS) | realtime (OpenAI Realtime API mode)
+
+models:
+  routing_strategy: "auto"    # auto (route by complexity) | fast (always fast) | strong (always strong)
+  fast_model: "gpt-4o-mini"   # ~250ms latency, used for simple commands, app launch, search, playback
+  strong_model: "gpt-4o"      # used for complex tasks, multi-step debugging, coding, deep reasoning
+  complex_keywords:
+    - "fix"
+    - "debug"
+    - "error"
+    - "refactor"
+    - "code"
+    - "script"
+    - "explain"
+    - "patch"
+    - "analyze"
+    - "review"
+    - "laravel"
+    - "docker"
+
 audio:
   sample_rate: 16000
   channels: 1
@@ -51,7 +72,7 @@ wake_word:
   sensitivity: 0.5               # 0.0–1.0; higher = more sensitive (more false triggers)
   debug_score: true              # log score whenever it is above 0.1
   silence_timeout_s: 4.0         # seconds with no speech at all before cancelling
-  command_silence_s: 1.5         # seconds of silence to end command recording
+  command_silence_s: 0.8         # seconds of silence to end command recording (lowered for faster response)
   vad_aggressiveness: 3          # webrtcvad aggressiveness 0–3 (3 = most aggressive)
   mute_hotkey: "<ctrl>+<shift>+m"  # global hotkey to toggle mic mute
   debug_save_audio: false        # save raw WAV to logs/debug_audio/ for debugging

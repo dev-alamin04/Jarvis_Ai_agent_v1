@@ -71,6 +71,8 @@ def transcribe(pcm_bytes: bytes, sample_rate: int = 16_000) -> str:
             model=TRANSCRIPTION_MODEL,
             file=wav_buf,
             language="en",
+            prompt="Voice command for Jarvis desktop assistant.",
+            temperature=0.0,
         )
         text = result.text.strip()
         logger.info(f"Transcribed: {text!r}")

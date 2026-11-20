@@ -59,3 +59,13 @@ def mute_beep(is_muted: bool) -> None:
     """
     freq = 1500.0 if is_muted else 600.0
     _play(_sine(freq, 0.15))
+
+
+def tool_start_chime() -> None:
+    """
+    Short subtle ascending chime (C6 -> E6, 60ms) played the moment a tool begins running,
+    providing immediate feedback so the user never experiences awkward silence.
+    """
+    tone1 = _sine(1046.5, 0.04) # C6
+    tone2 = _sine(1318.5, 0.05) # E6
+    _play(np.concatenate([tone1, tone2]))

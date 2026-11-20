@@ -66,9 +66,16 @@ def _on_command_received(pcm_bytes: bytes) -> None:
     Full pipeline: PCM → STT → Brain → TTS.
     Runs in the wake word thread; brain is thread-safe (stateless per call).
     """
+    from jarvis.timing import current_timing
+    timing = current_timing
+    if timing.recording_end == 0.0:
+        timing.mark_recording_end()
+
     # 1. Transcribe
     ui_events.emit("state", state="listening")          # ← UI hook
     text = transcribe(pcm_bytes)
+    timing.mark_stt_end(text)
+
     if not text:
         ui_events.emit("state", state="idle")           # ← UI hook
         speak("Sorry, I didn't catch that.")
@@ -78,7 +85,7 @@ def _on_command_received(pcm_bytes: bytes) -> None:
     print(f"\nYou: {text}")
     ui_events.emit("transcript", text=text)             # ← UI hook
 
-    # 2. Brain
+    # 2. Brain (with sentence-level TTS streaming)
     ui_events.emit("state", state="thinking")           # ← UI hook
 
     # Wrap speak_fn so permission prompts update the UI state
@@ -108,15 +115,15 @@ def _on_command_received(pcm_bytes: bytes) -> None:
             user_text=text,
             conversation_history=active_history,
             speak_fn=_speak_with_ui,
+            stream_to_voice=True,                       # streams sentence 1 immediately
         )
+
+    timing.mark_turn_end()
+    timing.log_summary()
 
     logger.info(f"Jarvis reply: {reply!r}")
     print(f"Jarvis: {reply}\n")
     ui_events.emit("reply", text=reply)                 # ← UI hook
-
-    # 3. Speak
-    ui_events.emit("state", state="speaking")           # ← UI hook
-    speak(reply)
     ui_events.emit("state", state="idle")               # ← UI hook
 
 

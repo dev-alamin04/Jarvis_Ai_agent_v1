@@ -50,7 +50,7 @@ _DTYPE: str = "int16"
 _CHUNK_MS: int = 80                  # OWW processes 80 ms chunks
 _CHUNK_SAMPLES: int = int(_SAMPLE_RATE * _CHUNK_MS / 1000)  # 1280 samples
 _SILENCE_TIMEOUT: float = float(get("wake_word.silence_timeout_s", 4.0))
-_COMMAND_SILENCE: float = float(get("wake_word.command_silence_s", 1.5))
+_COMMAND_SILENCE: float = float(get("wake_word.command_silence_s", 0.8))
 _DEBUG_SAVE_AUDIO: bool = bool(get("wake_word.debug_save_audio", False))
 _VAD_AGGRESSIVENESS: int = int(get("wake_word.vad_aggressiveness", 3))
 
@@ -154,8 +154,8 @@ class WakeWordListener:
         """sounddevice callback — runs in C audio thread, must be fast."""
         if status:
             logger.debug(f"sounddevice status: {status}")
-        # Drop audio while speaking (self-trigger guard) or muted
-        if audio_state.speaking.is_set() or audio_state.muted.is_set():
+        # Drop audio only when explicitly muted (allows wake word barge-in during speech)
+        if audio_state.muted.is_set():
             return
         try:
             self._pcm_queue.put_nowait(indata.tobytes())
@@ -204,6 +204,10 @@ class WakeWordListener:
                 logger.debug(f"{_WAKE_WORD} score: {score:.3f}")
 
             if score >= _SENSITIVITY:
+                if audio_state.speaking.is_set():
+                    logger.info("Barge-in: wake word detected during speech! Aborting TTS immediately.")
+                    audio_state.interrupted.set()
+
                 self._handle_detection()
                 # Clear OWW's internal buffer so the same utterance
                 # doesn't trigger a second detection
@@ -245,6 +249,11 @@ class WakeWordListener:
         if command_audio:
             if _DEBUG_SAVE_AUDIO:
                 _save_debug_wav(command_audio)
+            try:
+                from jarvis.timing import current_timing
+                current_timing.mark_recording_end()
+            except Exception:
+                pass
             self._on_wake(command_audio)
         else:
             logger.info("Wake word triggered but no speech detected — returning to listen.")
