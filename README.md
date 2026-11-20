@@ -32,6 +32,9 @@ Jarvis is a private, voice-controlled desktop AI agent built for Linux laptops. 
 - **Laravel Developer Assistant**: Voice-activated assistant for Laravel 10/11 & Pest/PHPUnit: autonomous debug & patch loop, test runner, git automation, automatic database backups before destructive migrations, table schema inspection, artisan scaffolding, and 4-pillar code review. Strict security barrier blocking `.env` access.
 - **Defense-in-Depth Safety Layer**: Non-bypassable safety boundary wrapping the permission gate: untrusted external data fencing (`<<<UNTRUSTED_EXTERNAL_DATA>>>`), second-check validating tool calls against voice intent, central tool risk table, exact command read-aloud, argument taint tracking, cryptographic SHA-256 tamper-evident audit chain, and spoken panic command (*"Jarvis, stop everything"*).
 - **Self-Review & Improve-a-Feature System**: Dual-branch autonomous improvement cycle (`stable` and `candidate`): voice commands *"review yourself"* and *"improve the <feature> feature"*, candidate-only patch application, test scoring, trial runs with automatic rollback on failure, permanent lock on security files, and mandatory spoken merge approval.
+- **Server Monitoring & DevOps**: SSH server telemetry, background site/SSL/error watcher with proactive voice alerts, remote log inspection, and guarded artisan/composer deployment tool.
+- **Security Reconnaissance & Server Defense**: Scope-enforced security recon for authorized domains and IPs, subdomain enumeration, DNS/SPF/DMARC auditing, rate-limited port scanning, exposed `.env` and `.git` detection, Laravel vulnerability audits, SSH/Nginx log defense, and permission-gated firewall IP blocking.
+- **Personal Assistant (Productivity Suite)**: Gmail integration (read, summarize, draft, send with mandatory draft read-aloud and spoken confirmation), Google Calendar schedule listing and natural language event creation, 10-minute proactive voice reminders, SQLite-persistent reminders & timers across restarts, morning daily briefing (*"good morning Jarvis"*), client message drafting (Fiverr/Upwork) in customized tones, and OAuth 2.0 local token protection (0600 permissions, never logged).
 
 ---
 
@@ -432,3 +435,68 @@ PYTHONPATH=. ./venv/bin/python tests/test_security_recon.py
 - [ ] **Server Defense**: Verified SSH brute force and web scanning detection.
 - [ ] **Firewall Blocking**: Verified spoken confirmation gate blocks unauthorized firewall changes.
 - [ ] **Audit Trail**: Verified logging to `logs/security_recon.log` and tamper-evident hash chain.
+
+---
+
+## Personal Assistant Suite
+
+Jarvis provides a comprehensive personal productivity suite directly accessible by voice, deeply integrated with your local developer and server infrastructure.
+
+### Voice Commands & Features
+
+| Capability | Example Spoken Commands | Key Safety Invariants |
+| :--- | :--- | :--- |
+| **Daily Briefing** | *"Good morning Jarvis"*, *"Give me the morning briefing"* | Combines today's calendar schedule, unread emails, server monitor health status, and due reminders in under 4 concise spoken sentences. |
+| **Gmail Management** | *"Read my new emails"*, *"Read thread msg_001"*, *"Draft a reply to Alex saying the demo is live"* | Connects via OAuth 2.0. Unread emails and thread summaries are read aloud. Drafts are safely created in Gmail without sending. |
+| **Sending Emails** | *"Send email to client@example.com: Invoice for Laravel milestone"* | **Strict Confirmation Gate**: The agent **MUST** read the complete email draft aloud verbatim first: *"Send email to client@example.com. Subject: ... Body: ... Shall I send this email?"* and wait for your spoken approval. |
+| **Google Calendar** | *"What's on my calendar today?"*, *"List tomorrow's events"*, *"Add event Team Standup tomorrow at 10am"* | Lists schedules and parses natural language times (*"tomorrow at 3pm"*, *"Friday at 11am"*). |
+| **10-Minute Event Alerts** | Automatic background alert: *"Alamin, you have 'Team Standup' starting in 10 minutes at 10:00 AM."* | Background watcher polls every 60s and alerts you 10 minutes prior to every scheduled meeting. |
+| **Reminders & Timers** | *"Remind me in 20 minutes to check queue workers"*, *"Remind me tomorrow at 9 to deploy security patch"* | Stored locally in SQLite (`data/reminders.db`). Persists and reliably triggers even after computer reboots or process restarts. |
+| **Client Messages** | *"Draft a reply to Alex on Fiverr: we deployed the fix, tone reassuring"*, *"Draft an Upwork reply, tone technical and concise"* | Drafts professional responses tailored to Fiverr, Upwork, or direct clients in tones: *professional and friendly*, *technical and concise*, *reassuring*, or *persuasive*. **Invariant**: Jarvis never sends client messages automatically. |
+
+### OAuth 2.0 Security & Protected Storage
+
+1. **Local Protected File**: Tokens are stored at `data/tokens/google_token.json`.
+2. **File Permissions (`chmod 0600`)**: Read/write access is restricted exclusively to your user account (`-rw-------`).
+3. **Never Logged or Stored in Memory**: OAuth refresh tokens, access tokens, and client secrets are stripped from loggers, memory prompts, and debug traces.
+4. **Offline / Simulation Fallback**: If Google OAuth credentials are not configured, Jarvis automatically switches to an offline simulated dataset for development and testing without raising unexpected crashes.
+
+### Linux Setup & Installation
+
+Install the required Google Client APIs in the Jarvis virtual environment:
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Install Google OAuth & API clients
+pip install google-api-python-client google-auth-oauthlib google-auth
+```
+
+To configure live Google credentials:
+1. Create a project in [Google Cloud Console](https://console.cloud.google.com/).
+2. Enable the **Gmail API** and **Google Calendar API**.
+3. Create an **OAuth 2.0 Client ID** (Desktop Application) and download `credentials.json`.
+4. Place the credentials file at `config/google_credentials.json`.
+5. On first voice command (e.g. *"read my emails"*), a browser prompt will appear for one-time OAuth consent.
+6. The authorized token will be safely saved to `data/tokens/google_token.json` with permissions `0600`.
+
+### Personal Assistant Test Checklist
+
+Run the complete test suite:
+```bash
+PYTHONPATH=. ./venv/bin/python tests/test_personal_assistant.py
+```
+
+- [ ] **OAuth Security**: Verified token permissions are `0600` and tokens are ignored by git.
+- [ ] **Gmail List & Read**: Verified fetching unread emails and thread detail extraction.
+- [ ] **Gmail Drafting**: Verified draft creation without triggering an email send.
+- [ ] **Gmail Confirmation Gate**: Verified that Jarvis reads the draft aloud verbatim and blocks unauthorized sends unless user says "yes".
+- [ ] **Calendar Listing**: Verified listing events for today and tomorrow.
+- [ ] **Calendar Event Scheduling**: Verified natural language time parsing into calendar entries.
+- [ ] **Proactive 10-Minute Alerts**: Verified background alert fires once exactly 10 minutes prior to event start without duplicate triggers.
+- [ ] **Reminders Natural Language**: Verified parsing of relative durations (*"in 20 minutes"*, *"in 1 hour"*) and clock times (*"tomorrow at 9"*).
+- [ ] **SQLite Persistence & Restarts**: Verified reminders survive Jarvis shutdowns and alert when due after restart.
+- [ ] **Daily Briefing**: Verified morning briefing integrates calendar, unread emails, server status, and pending reminders in under 5 spoken sentences.
+- [ ] **Client Messages**: Verified tone selection and strict invariant preventing automatic sending.
+- [ ] **Daemon Watcher**: Verified background assistant thread starts and stops gracefully.
+- [ ] **Tool Risk Classification**: Verified `gmail_send_email` is `NEEDS_CONFIRMATION` in `CENTRAL_TOOL_RISK_TABLE` and query tools are `SAFE`.

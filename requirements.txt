@@ -38,3 +38,8 @@ playwright>=1.40.0         # browser automation with persistent profiles
 
 # ── Security Recon & Defense ─────────────────────────────────────────────
 dnspython>=2.4.0           # DNS record resolution and mail security audit
+
+# ── Personal Assistant & Google Workspace ────────────────────────────────
+google-api-python-client>=2.100.0  # Gmail & Google Calendar API client
+google-auth-oauthlib>=1.2.0        # OAuth 2.0 flow for desktop apps
+google-auth>=2.25.0                 # Google authentication library

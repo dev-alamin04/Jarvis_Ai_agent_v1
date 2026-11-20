@@ -82,6 +82,19 @@ from jarvis.tools.recon_tools import (
     recon_server_defense_audit,
     recon_block_ip,
 )
+from jarvis.tools.assistant_tools import (
+    gmail_list_unread,
+    gmail_read_thread,
+    gmail_draft_reply,
+    gmail_send_email,
+    calendar_list_events,
+    calendar_add_event,
+    add_reminder,
+    list_reminders,
+    cancel_reminder,
+    get_daily_briefing,
+    client_draft_reply,
+)
 
 
 @dataclass
@@ -1349,6 +1362,237 @@ _TOOL_DEFS: list[ToolDef] = [
                 },
             },
             "required": ["server_name", "ip_address"],
+        },
+    ),
+
+    # ── gmail_list_unread ────────────────────────────────────────────────────
+    ToolDef(
+        name="gmail_list_unread",
+        fn=gmail_list_unread,
+        description="List and summarize new, unread, or important emails from Gmail.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximum number of unread emails to retrieve (default 5).",
+                },
+            },
+        },
+    ),
+
+    # ── gmail_read_thread ────────────────────────────────────────────────────
+    ToolDef(
+        name="gmail_read_thread",
+        fn=gmail_read_thread,
+        description="Read and summarize the full text of an email message or thread by ID.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "thread_id_or_msg_id": {
+                    "type": "string",
+                    "description": "The message ID or thread ID to read.",
+                },
+            },
+            "required": ["thread_id_or_msg_id"],
+        },
+    ),
+
+    # ── gmail_draft_reply ────────────────────────────────────────────────────
+    ToolDef(
+        name="gmail_draft_reply",
+        fn=gmail_draft_reply,
+        description="Create a draft email reply in Gmail without sending it.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "to": {
+                    "type": "string",
+                    "description": "Recipient email address.",
+                },
+                "subject": {
+                    "type": "string",
+                    "description": "Email subject line.",
+                },
+                "body": {
+                    "type": "string",
+                    "description": "Email draft content.",
+                },
+                "thread_id": {
+                    "type": "string",
+                    "description": "Optional thread ID to link draft to an existing email conversation.",
+                },
+            },
+            "required": ["to", "subject", "body"],
+        },
+    ),
+
+    # ── gmail_send_email ─────────────────────────────────────────────────────
+    ToolDef(
+        name="gmail_send_email",
+        fn=gmail_send_email,
+        description="Send an email via Gmail. Strictly requires spoken confirmation after reading the draft aloud verbatim.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "to": {
+                    "type": "string",
+                    "description": "Recipient email address.",
+                },
+                "subject": {
+                    "type": "string",
+                    "description": "Email subject line.",
+                },
+                "body": {
+                    "type": "string",
+                    "description": "Body text of the email.",
+                },
+                "thread_id": {
+                    "type": "string",
+                    "description": "Optional thread ID to reply to.",
+                },
+            },
+            "required": ["to", "subject", "body"],
+        },
+    ),
+
+    # ── calendar_list_events ─────────────────────────────────────────────────
+    ToolDef(
+        name="calendar_list_events",
+        fn=calendar_list_events,
+        description="List scheduled calendar events for 'today', 'tomorrow', or 'both'.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "day": {
+                    "type": "string",
+                    "enum": ["today", "tomorrow", "both"],
+                    "description": "Day to list events for (default 'today').",
+                },
+            },
+        },
+    ),
+
+    # ── calendar_add_event ───────────────────────────────────────────────────
+    ToolDef(
+        name="calendar_add_event",
+        fn=calendar_add_event,
+        description="Add a new event to Google Calendar from voice (e.g. 'Meeting with client' at 'tomorrow at 3pm').",
+        parameters={
+            "type": "object",
+            "properties": {
+                "summary": {
+                    "type": "string",
+                    "description": "Title or summary of the event.",
+                },
+                "start_time": {
+                    "type": "string",
+                    "description": "Natural language start time (e.g. 'tomorrow at 3pm', 'today at 18:00', '2026-11-21 14:00').",
+                },
+                "duration_minutes": {
+                    "type": "integer",
+                    "description": "Duration of event in minutes (default 60).",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Optional details or meeting link.",
+                },
+            },
+            "required": ["summary", "start_time"],
+        },
+    ),
+
+    # ── add_reminder ─────────────────────────────────────────────────────────
+    ToolDef(
+        name="add_reminder",
+        fn=add_reminder,
+        description="Set a persistent local reminder or timer (e.g. 'check oven' in '20 minutes', or 'call client' 'tomorrow at 9'). Speaks aloud when due even across restarts.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The reminder description or task.",
+                },
+                "due_time": {
+                    "type": "string",
+                    "description": "Due time string: relative ('in 20 minutes', 'in 1 hour') or absolute ('tomorrow at 9', 'today at 18:00').",
+                },
+            },
+            "required": ["text", "due_time"],
+        },
+    ),
+
+    # ── list_reminders ───────────────────────────────────────────────────────
+    ToolDef(
+        name="list_reminders",
+        fn=list_reminders,
+        description="List all scheduled pending reminders and timers.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "include_completed": {
+                    "type": "boolean",
+                    "description": "Whether to include completed/past reminders (default false).",
+                },
+            },
+        },
+    ),
+
+    # ── cancel_reminder ──────────────────────────────────────────────────────
+    ToolDef(
+        name="cancel_reminder",
+        fn=cancel_reminder,
+        description="Cancel a scheduled reminder by its ID number.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "reminder_id": {
+                    "type": "integer",
+                    "description": "The reminder ID number to cancel.",
+                },
+            },
+            "required": ["reminder_id"],
+        },
+    ),
+
+    # ── get_daily_briefing ───────────────────────────────────────────────────
+    ToolDef(
+        name="get_daily_briefing",
+        fn=get_daily_briefing,
+        description="Provide a complete morning briefing combining calendar schedule, unread emails, server infrastructure status, and pending reminders. Triggered by 'good morning Jarvis'.",
+        parameters={
+            "type": "object",
+            "properties": {},
+        },
+    ),
+
+    # ── client_draft_reply ───────────────────────────────────────────────────
+    ToolDef(
+        name="client_draft_reply",
+        fn=client_draft_reply,
+        description="Draft a response for Fiverr, Upwork, or direct client inquiries in the requested tone (e.g. 'professional and friendly', 'technical and concise', 'reassuring'). Never sends automatically.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "client_name": {
+                    "type": "string",
+                    "description": "Name of the client or recipient.",
+                },
+                "platform": {
+                    "type": "string",
+                    "description": "Platform (e.g. 'Fiverr', 'Upwork', 'WhatsApp', 'Email').",
+                },
+                "inquiry_or_context": {
+                    "type": "string",
+                    "description": "Context of the client's message or task.",
+                },
+                "tone": {
+                    "type": "string",
+                    "description": "Desired tone: 'professional and friendly', 'technical and concise', 'reassuring', or 'persuasive'.",
+                },
+            },
+            "required": ["client_name", "platform", "inquiry_or_context"],
         },
     ),
 ]

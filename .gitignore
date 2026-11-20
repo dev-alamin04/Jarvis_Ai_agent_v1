@@ -32,6 +32,9 @@ data/browser_profiles/
 # ── Secrets ──────────────────────────────────────
 .env
 *.env
+data/tokens/
+config/*credentials*.json
+config/*token*.json
 
 # ── Audio temp files ──────────────────────────────
 *.wav
