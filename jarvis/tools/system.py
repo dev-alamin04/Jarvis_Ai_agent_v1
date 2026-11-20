@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import shlex
 import subprocess
+import sys
 import urllib.parse
 from pathlib import Path
 
@@ -105,3 +106,48 @@ def open_url(url: str) -> str:
         return f"Opened URL: {url}"
     except Exception as exc:
         return f"Failed to open URL `{url}`: {exc}"
+
+
+# ── play_youtube ──────────────────────────────────────────────────────────────
+
+def play_youtube(query: str = "") -> str:
+    """
+    Search YouTube using yt-dlp and open the top video in the default web browser.
+    If query is empty or generic 'play music', searches for 'popular songs'.
+    """
+    cleaned = (query or "").strip()
+    if not cleaned or cleaned.lower() in ("play music", "music", "play some music", "songs", "popular music"):
+        cleaned = "popular songs"
+
+    logger.info(f"play_youtube: searching for {cleaned!r}")
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "yt_dlp",
+        "--get-id",
+        "--no-playlist",
+        f"ytsearch1:{cleaned}",
+    ]
+
+    try:
+        res = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        video_id = res.stdout.strip()
+        if not video_id or res.returncode != 0:
+            err = res.stderr.strip() or "No video found"
+            logger.error(f"yt-dlp error: {err}")
+            return f"Failed to find a YouTube video for '{cleaned}': {err}"
+
+        # If multiple lines are returned, take the first one
+        video_id = video_id.splitlines()[0].strip()
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        return open_url(url)
+    except subprocess.TimeoutExpired:
+        return f"Searching YouTube for '{cleaned}' timed out."
+    except Exception as exc:
+        return f"Failed to play YouTube video: {exc}"

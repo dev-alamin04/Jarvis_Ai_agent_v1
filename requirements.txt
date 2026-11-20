@@ -23,3 +23,6 @@ pywebview>=5.0.0           # desktop window wrapper (uses system GTK+WebKit2)
 websockets>=12.0           # local WebSocket event server
 pystray>=0.19.0            # system tray icon
 Pillow>=10.0.0             # tray icon generation
+
+# ── Media Tools ──────────────────────────────────────────────────────────────
+yt-dlp>=2024.0.0           # YouTube video search and ID retrieval

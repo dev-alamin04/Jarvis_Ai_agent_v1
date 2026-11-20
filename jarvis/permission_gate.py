@@ -55,6 +55,7 @@ _ALWAYS_DANGEROUS_TOOLS: set[str] = {
 _ALWAYS_SAFE_TOOLS: set[str] = {
     "open_app",
     "open_url",
+    "play_youtube",
     "read_file",
     "list_directory",
     "read_laravel_log",

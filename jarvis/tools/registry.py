@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Any
 
 # ── Import tool implementations ───────────────────────────────────────────────
-from jarvis.tools.system import run_shell_command, open_app, open_url
+from jarvis.tools.system import run_shell_command, open_app, open_url, play_youtube
 
 
 @dataclass
@@ -89,8 +89,9 @@ _TOOL_DEFS: list[ToolDef] = [
         name="open_url",
         fn=open_url,
         description=(
-            "Open a URL in the default web browser. "
-            "Use this for websites, YouTube, documentation, or search queries."
+            "Open a specific URL in the default web browser. "
+            "Use this for general websites, documentation, or direct URLs. "
+            "Do NOT use this to play, listen to, or watch songs or videos; use play_youtube instead."
         ),
         parameters={
             "type": "object",
@@ -101,6 +102,31 @@ _TOOL_DEFS: list[ToolDef] = [
                 },
             },
             "required": ["url"],
+        },
+    ),
+
+    # ── play_youtube ─────────────────────────────────────────────────────────
+    ToolDef(
+        name="play_youtube",
+        fn=play_youtube,
+        description=(
+            "Search for and play a video, song, or music on YouTube in the browser. "
+            "Use this tool whenever the user says 'play', 'listen to', or 'watch' something, "
+            "such as music, songs, artists, or videos. "
+            "If the user says only 'play music' with no specifics, search for 'popular songs' instead of refusing."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "The search term or song/video title. If the user only asked to 'play music' "
+                        "with no specifics, use 'popular songs'."
+                    ),
+                },
+            },
+            "required": ["query"],
         },
     ),
 ]

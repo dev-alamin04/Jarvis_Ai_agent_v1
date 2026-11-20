@@ -100,7 +100,9 @@ class SpeechCollector:
         self._speech_start_frames = speech_start_frames
         self._silence_frames_needed = silence_frames
 
-        self._ring: collections.deque[bool] = collections.deque(
+        # Ring stores (frame_bytes, is_speech) pairs, so the frames that
+        # arrived just before speech started can be included in the utterance.
+        self._ring: collections.deque[tuple[bytes, bool]] = collections.deque(
             maxlen=self._ring_size
         )
         self._speech_started = False
@@ -120,19 +122,19 @@ class SpeechCollector:
             Complete utterance PCM when speech ends, else None.
         """
         for frame, is_speech in self._framer.feed(pcm_bytes):
-            self._ring.append(is_speech)
+            self._ring.append((frame, is_speech))
 
             if not self._speech_started:
                 # Detect start: enough recent frames are speech
-                if sum(self._ring) >= self._speech_start_frames:
+                if sum(s for _, s in self._ring) >= self._speech_start_frames:
                     self._speech_started = True
                     logger.debug("VAD: speech started")
-                    # Include buffered frames in collection
-                    self._collected.extend(list(self._ring))
+                    # Include buffered frames (bytes only) in collection
+                    self._collected.extend(f for f, _ in self._ring)
             else:
                 self._collected.append(frame)
                 # Detect end: tail of ring is all silence
-                tail = list(self._ring)[-self._silence_frames_needed:]
+                tail = [s for _, s in list(self._ring)[-self._silence_frames_needed:]]
                 if len(tail) == self._silence_frames_needed and not any(tail):
                     # Speech ended
                     audio = b"".join(self._collected)
