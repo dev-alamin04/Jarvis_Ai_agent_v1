@@ -283,3 +283,86 @@ PYTHONPATH=. ./venv/bin/python tests/test_self_update.py
 - [ ] **Auto-Rollback on Crash**: Verified candidate startup failure reverts automatically to stable commit.
 - [ ] **Explicit Merge Approval**: Verified candidate merges into stable only upon explicit spoken "yes".
 - [ ] **Audit Logging**: Verified persistent records in `logs/self_update.log`.
+
+---
+
+## Server Monitoring & DevOps Assistant
+
+Jarvis includes a complete server monitoring and DevOps suite to manage remote Linux servers (CloudPanel, DigitalOcean VPS, Hostinger VPS) and websites directly by voice with SSH connectivity, proactive alerting, and strict safety controls.
+
+### Core Capabilities
+
+1. **Server & Website Configuration (`config/servers.yaml`)**:
+   - Lists servers (name, host, SSH port, user, key path, type, managed services, backup directory) and websites (name, URL, server, project path, log paths).
+   - **Secrets Invariant**: Private SSH keys and passwords stay strictly in files outside the repo (e.g. `~/.ssh/id_rsa`), never stored in memory or written to logs.
+2. **Server Health Check (`server_health_check`)**:
+   - Connects over SSH and inspects:
+     - Disk usage (`df -h /`)
+     - RAM allocation & available memory (`free -m`)
+     - CPU load average and system uptime (`uptime`)
+     - Status of core system services (`systemctl is-active`: nginx, PHP-FPM, MySQL, Redis)
+     - Supervisor queue worker status (`supervisorctl status`)
+     - Docker container states (`docker ps`)
+   - Returns a structured Markdown table and speaks a concise voice summary aloud.
+3. **Proactive Background Watcher (`BackgroundServerWatcher`)**:
+   - Background daemon thread checking every few minutes:
+     - Website HTTP responses (alerts if down or error status)
+     - SSL certificate expiry dates (alerts if expiring within threshold days)
+     - Remote Laravel & Nginx error logs (alerts when new error entries appear)
+   - Speaks up on its own:
+     > *"Alamin, the site is not responding."*  
+     > *"Alamin, the SSL certificate for mrym_laravel expires in 5 days."*  
+     > *"Alamin, new errors appeared in the Laravel log on cloudpanel_prod."*
+   - Automatic cooldown prevents spamming duplicate alerts.
+4. **Remote Log Analysis & Diagnosis (`server_analyze_logs`)**:
+   - Reads the latest lines of `laravel.log`, `nginx/error.log`, or `syslog` over SSH.
+   - Detects known issues: database connection refused, Redis unavailability, 502 Bad Gateway / PHP-FPM socket errors, storage directory permissions, unrun migrations.
+   - Summarizes errors and recommends exact remediation commands.
+5. **Multi-Step Deployment Pipeline (`server_deploy`)**:
+   - Deploys projects with automated safety steps:
+     1. `git fetch` and `git pull origin <branch>`
+     2. `composer install --no-dev --optimize-autoloader`
+     3. **Mandatory Pre-Migration Database Backup** (taken before any migration!)
+     4. `php artisan migrate --force`
+     5. Optimization and cache clear (`optimize:clear`, `config:cache`, `route:cache`, `view:cache`)
+     6. Queue restart (`queue:restart` and supervisor reload)
+   - Requires user spoken confirmation before execution.
+6. **Remote Backup Check (`server_check_backups`)**:
+   - Verifies backup files exist on the remote server, reports size and timestamps, and alerts if backups are stale (> 24 hours old).
+7. **Service Control & Remote Shell (`server_restart_service`, `server_run_remote_command`)**:
+   - Restarts remote systemd services (nginx, php-fpm, mysql, redis) with confirmation.
+   - Executes arbitrary remote commands with permission checks and command scrubbing.
+
+### DevOps Permission Gate Rules
+
+| Tool / Action | Permission Rule | User Prompt |
+| :--- | :--- | :--- |
+| `server_health_check` | **SAFE** (Read-Only) | Runs freely without confirmation |
+| `server_check_backups` | **SAFE** (Read-Only) | Runs freely without confirmation |
+| `server_analyze_logs` | **SAFE** (Read-Only) | Runs freely without confirmation |
+| `server_list_sites` | **SAFE** (Read-Only) | Runs freely without confirmation |
+| `server_restart_service` | **NEEDS CONFIRMATION** | Requires spoken approval |
+| `server_deploy` | **NEEDS CONFIRMATION** | Requires spoken approval (takes pre-migration backup) |
+| `sudo` / state-changing commands | **NEEDS CONFIRMATION** | Requires spoken approval |
+| Destructive actions (`rm`, `drop database`, `ufw`) | **EXACT READ-ALOUD FIRST** | Reads exact command aloud before asking for approval |
+
+### Audit Logging
+- Every remote command is logged with timestamp, user, server name, scrubbed command, exit code, and execution summary to `logs/remote_commands.log`.
+- All commands are mirrored into the tamper-evident cryptographic hash chain in `logs/tamper_evident_actions.jsonl`.
+- Sensitive passwords, bearer tokens, and credentials are automatically scrubbed (`***`) before logging.
+
+### DevOps Test Checklist
+
+Run the automated server monitoring & DevOps test suite:
+```bash
+PYTHONPATH=. ./venv/bin/python tests/test_devops_monitoring.py
+```
+- [ ] **Config & Fuzzy Server Lookup**: Verified loading of `config/servers.yaml` and fuzzy resolution of server names and website aliases.
+- [ ] **Secrets Outside Repo**: Verified keys reside in `~/.ssh/` and no plaintext passwords exist in configuration or logs.
+- [ ] **SSH Health Check**: Verified disk, RAM, CPU load, uptime, services, queue workers, and Docker reporting.
+- [ ] **Remote Log Analysis**: Verified root-cause diagnosis (MySQL, Redis, Nginx 502, permissions) and fix recommendations.
+- [ ] **Deploy Pipeline**: Verified 6-step deployment and enforced pre-migration database backup before `artisan migrate`.
+- [ ] **Backup Verification**: Verified remote backup discovery, file age calculation, and staleness warning.
+- [ ] **DevOps Permission Gate**: Verified read-only bypass, service restart approval, and exact command announcement for destructive actions.
+- [ ] **Background Watcher**: Verified HTTP downtime detection, SSL certificate expiry warning, new error detection, and proactive voice alerts.
+- [ ] **Audit Log & Tamper Chain**: Verified logging to `logs/remote_commands.log` and integrity of cryptographic hash chain.
