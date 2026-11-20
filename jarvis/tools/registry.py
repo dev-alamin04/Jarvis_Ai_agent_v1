@@ -1,0 +1,127 @@
+"""
+jarvis/tools/registry.py
+Central registry that maps tool names to their implementation functions and
+OpenAI function-call schemas.
+
+Adding a new tool:
+  1. Implement it in a submodule of jarvis/tools/.
+  2. Import the function here.
+  3. Add a ToolDef entry to _TOOL_DEFS.
+"""
+
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Callable, Any
+
+# ── Import tool implementations ───────────────────────────────────────────────
+from jarvis.tools.system import run_shell_command, open_app, open_url
+
+
+@dataclass
+class ToolDef:
+    name: str
+    fn: Callable[..., str]
+    description: str
+    parameters: dict = field(default_factory=dict)
+
+
+# ── Tool definitions ─────────────────────────────────────────────────────────
+
+_TOOL_DEFS: list[ToolDef] = [
+    # ── run_shell_command ────────────────────────────────────────────────────
+    ToolDef(
+        name="run_shell_command",
+        fn=run_shell_command,
+        description=(
+            "Run an arbitrary shell command on the user's Linux machine "
+            "and return stdout + stderr. The permission gate will intercept "
+            "dangerous commands and ask the user before running them."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The full shell command to execute.",
+                },
+                "working_dir": {
+                    "type": "string",
+                    "description": "Optional working directory (absolute path).",
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": "Timeout in seconds (default 30).",
+                },
+            },
+            "required": ["command"],
+        },
+    ),
+
+    # ── open_app ─────────────────────────────────────────────────────────────
+    ToolDef(
+        name="open_app",
+        fn=open_app,
+        description=(
+            "Launch a desktop application by its friendly name, e.g. 'vscode', "
+            "'browser', 'terminal', 'nautilus'. Returns immediately after spawning."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "app_name": {
+                    "type": "string",
+                    "description": (
+                        "Friendly application name as configured (e.g. 'vscode', "
+                        "'chrome', 'terminal') or a raw executable name."
+                    ),
+                },
+                "file_or_args": {
+                    "type": "string",
+                    "description": "Optional file path or extra argument to pass to the app.",
+                },
+            },
+            "required": ["app_name"],
+        },
+    ),
+
+    # ── open_url ─────────────────────────────────────────────────────────────
+    ToolDef(
+        name="open_url",
+        fn=open_url,
+        description=(
+            "Open a URL in the default web browser. "
+            "Use this for websites, YouTube, documentation, or search queries."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "The full URL to open (must start with http:// or https://).",
+                },
+            },
+            "required": ["url"],
+        },
+    ),
+]
+
+
+# ── Public accessors ─────────────────────────────────────────────────────────
+
+# name → implementation function
+TOOL_REGISTRY: dict[str, Callable[..., str]] = {t.name: t.fn for t in _TOOL_DEFS}
+
+
+def get_tool_schemas() -> list[dict]:
+    """Return OpenAI-compatible function-call schema list."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": t.name,
+                "description": t.description,
+                "parameters": t.parameters,
+            },
+        }
+        for t in _TOOL_DEFS
+    ]

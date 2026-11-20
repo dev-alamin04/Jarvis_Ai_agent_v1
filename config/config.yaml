@@ -1,0 +1,70 @@
+# Jarvis Configuration
+# Edit this file to customise Jarvis behaviour.
+
+openai:
+  model: "gpt-4o"
+  transcription_model: "whisper-1"
+  tts_model: "tts-1"
+  tts_voice: "echo"           # alloy | echo | fable | onyx | nova | shimmer
+  max_tool_iterations: 6      # max tool calls per conversation turn
+
+audio:
+  sample_rate: 16000
+  channels: 1
+  dtype: "int16"
+  silence_threshold: 500      # RMS below this = silence
+  silence_duration: 1.5       # seconds of silence to auto-stop recording
+  min_recording_duration: 0.5 # ignore very short blips
+
+hotkey:
+  push_to_talk: "ctrl+shift+space"
+
+logging:
+  action_log: "logs/actions.log"
+  self_review_log: "logs/self_review.log"
+  level: "INFO"
+
+projects:
+  # Add your project paths here, e.g.:
+  # jarvis: /home/alamin/Server/jarvis
+  # my_app: /home/alamin/projects/my_app
+
+protected_paths:
+  - /home/alamin/.ssh
+  - /home/alamin/.gnupg
+  - /etc
+  - /boot
+  - /sys
+  - /proc
+  - /home/alamin/Server/jarvis/jarvis/permission_gate.py
+  - /home/alamin/Server/jarvis/jarvis/self_update.py
+
+apps:
+  # Friendly name -> command
+  code: "code"
+  vscode: "code"
+  browser: "xdg-open"
+  chrome: "google-chrome"
+  firefox: "firefox"
+  terminal: "kgx"            # GNOME Console; change to gnome-terminal if preferred
+  nautilus: "nautilus"
+  files: "nautilus"
+
+git:
+  backup_branch_prefix: "jarvis-backup"
+  candidate_branch: "candidate"
+  stable_branch: "stable"
+
+services:
+  laravel:
+    command: "php artisan serve"
+    name: "Laravel Dev Server"
+  docker:
+    command: "docker compose up -d"
+    name: "Docker"
+  mysql:
+    command: "sudo systemctl"
+    name: "MySQL"
+  redis:
+    command: "sudo systemctl"
+    name: "Redis"

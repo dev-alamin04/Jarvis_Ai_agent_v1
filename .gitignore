@@ -1,0 +1,32 @@
+# ── Python ───────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# ── Virtual envs ─────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Logs ─────────────────────────────────────────
+logs/*.log
+
+# ── Secrets ──────────────────────────────────────
+.env
+*.env
+
+# ── Audio temp files ──────────────────────────────
+*.wav
+*.mp3
+*.opus
+/tmp/jarvis_*
+
+# ── IDE ───────────────────────────────────────────
+.vscode/settings.json
+.idea/
