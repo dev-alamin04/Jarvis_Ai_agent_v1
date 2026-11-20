@@ -99,6 +99,11 @@ from jarvis.tools.cost_tools import (
     get_cost_today,
     get_cost_month,
 )
+from jarvis.tools.routine_tools import (
+    run_routine,
+    list_routines,
+    create_routine,
+)
 
 
 @dataclass
@@ -1620,6 +1625,58 @@ _TOOL_DEFS: list[ToolDef] = [
             "Returns a breakdown of monthly spending against the monthly budget limit."
         ),
         parameters={"type": "object", "properties": {}},
+    ),
+
+    # ── run_routine ───────────────────────────────────────────────────────────
+    ToolDef(
+        name="run_routine",
+        fn=run_routine,
+        description=(
+            "Execute a configured routine by name or trigger phrase (e.g. 'work_mode', 'end_of_day', 'server_check'). "
+            "Runs all steps sequentially through the permission gate."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "routine_name": {
+                    "type": "string",
+                    "description": "Name or trigger phrase of the routine to execute.",
+                },
+            },
+            "required": ["routine_name"],
+        },
+    ),
+
+    # ── list_routines ─────────────────────────────────────────────────────────
+    ToolDef(
+        name="list_routines",
+        fn=list_routines,
+        description="List all configured routines, their voice trigger phrases, descriptions, and action counts.",
+        parameters={"type": "object", "properties": {}},
+    ),
+
+    # ── create_routine ────────────────────────────────────────────────────────
+    ToolDef(
+        name="create_routine",
+        fn=create_routine,
+        description=(
+            "Create a new multi-step routine from natural language. "
+            "Reads back the parsed steps and saves it only after user spoken confirmation."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Short name or identifier for the new routine (e.g. 'study mode').",
+                },
+                "steps_description": {
+                    "type": "string",
+                    "description": "Natural language description of the steps (e.g. 'open chrome to google.com and play youtube lofi').",
+                },
+            },
+            "required": ["name", "steps_description"],
+        },
     ),
 ]
 

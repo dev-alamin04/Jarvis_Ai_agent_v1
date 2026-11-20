@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
-from jarvis.devops.config import find_server
+from jarvis.devops.config import find_server, get_all_servers
 from jarvis.devops.ssh_client import execute_remote_command
 from jarvis.logger import logger
 
@@ -28,8 +28,18 @@ def server_health_check(server_name: str) -> str:
     Parameters
     ----------
     server_name : str
-        The name or alias of the server (e.g. 'cloudpanel_prod', 'do_vps', 'hostinger_vps').
+        The name or alias of the server (e.g. 'cloudpanel_prod', 'do_vps', 'hostinger_vps', or 'all').
     """
+    clean_name = server_name.lower().strip()
+    if clean_name in ("all", "all_servers", "*"):
+        all_servers = get_all_servers()
+        if not all_servers:
+            return "No servers configured in config/servers.yaml."
+        reports = []
+        for s in all_servers:
+            reports.append(server_health_check(s["name"]))
+        return f"# 🖥️ Comprehensive Server Health Report ({len(all_servers)} servers)\n\n" + "\n\n---\n\n".join(reports)
+
     server = find_server(server_name)
     if not server:
         return f"Server `{server_name}` was not found in config/servers.yaml."

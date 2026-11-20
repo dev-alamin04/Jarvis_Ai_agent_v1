@@ -36,6 +36,7 @@ Jarvis is a private, voice-controlled desktop AI agent built for Linux laptops. 
 - **Security Reconnaissance & Server Defense**: Scope-enforced security recon for authorized domains and IPs, subdomain enumeration, DNS/SPF/DMARC auditing, rate-limited port scanning, exposed `.env` and `.git` detection, Laravel vulnerability audits, SSH/Nginx log defense, and permission-gated firewall IP blocking.
 - **Personal Assistant (Productivity Suite)**: Gmail integration (read, summarize, draft, send with mandatory draft read-aloud and spoken confirmation), Google Calendar schedule listing and natural language event creation, 10-minute proactive voice reminders, SQLite-persistent reminders & timers across restarts, morning daily briefing (*"good morning Jarvis"*), client message drafting (Fiverr/Upwork) in customized tones, and OAuth 2.0 local token protection (0600 permissions, never logged).
 - **Cost Tracking & Spending Limits**: Real-time token and cost counting for model completions, Whisper transcription, and TTS speech output. Persistent SQLite storage (`data/cost.db`) aggregated daily and monthly. Voice inquiries (*"how much have I spent today"*, *"how much this month"*), 80% voice warning alerts, 100% automatic downgrade to `gpt-4o-mini`, expensive action spoken confirmation gates, running HUD cost display in the UI, and absolute zero API key logging security invariant.
+- **Automated Multi-Step Routines**: Trigger sequential tool workflows using custom or starter voice phrases: *"work mode"*, *"end of day"*, and *"server check"*. Create new routines naturally by voice (*"make a routine called study mode that opens..."*). Strict security invariant: Jarvis reads the steps back aloud and saves only after your spoken confirmation, and every step is executed strictly through the Permission Gate.
 
 ---
 
@@ -556,3 +557,56 @@ PYTHONPATH=. ./venv/bin/python tests/test_cost_tracking.py
 - [ ] **Real-Time UI Display**: Verified WebSocket `cost` event emission and HTML HUD display.
 - [ ] **API Key Security**: Verified API keys (`sk-...`) are strictly scrubbed and never logged or persisted.
 - [ ] **Tool Registry Integration**: Verified `get_cost_today` and `get_cost_month` are registered as `SAFE` in Central Risk Table.
+
+---
+
+## Automated Routines Suite
+
+Jarvis supports multi-step automated routines, enabling a single voice phrase to execute a chained sequence of tools and shell operations.
+
+### Starter Routines
+
+| Routine Name | Voice Trigger Phrases | Automated Action Steps |
+| :--- | :--- | :--- |
+| **Work Mode** | *"Work mode"*, *"start work"*, *"enter work mode"* | 1. Open VS Code on active Laravel project (`open_app`).<br>2. Start Laravel dev server in background (`run_shell_command`).<br>3. Open browser to local site `http://127.0.0.1:8000` (`browser_open`). |
+| **End of Day** | *"End of day"*, *"wrap up"*, *"finish work for today"* | 1. Show git status of active project (`laravel_git_status`).<br>2. Review pending reminders & tasks to commit (`list_reminders`).<br>3. Stop local development servers (`run_shell_command`).<br>4. Summarize today's activities and spending (`get_cost_today`). |
+| **Server Check** | *"Server check"*, *"check servers"*, *"check all servers"* | Connects via SSH to all configured servers in `config/servers.yaml` (`cloudpanel_prod`, `do_vps`, `hostinger_vps`), gathers disk, RAM, CPU load, uptime, and system services, and presents a spoken summary. |
+
+### Voice Routine Creation & Mandatory Readback Gate
+
+You can create new routines naturally by voice:
+> *"Hey Jarvis, make a routine called study mode that opens Chrome to https://google.com and plays YouTube lofi beats."*
+
+**Security Invariant & Readback Gate**:
+1. Jarvis analyzes your request and translates it into tool operations.
+2. Jarvis **MUST** read the steps back aloud before anything is saved:
+   > *"Create routine 'Study Mode' with 2 steps: Step 1: Open browser to https://google.com, Step 2: Play YouTube lofi beats. Shall I save this routine?"*
+3. Jarvis waits for your spoken **"yes"**.
+   - If you say "no", routine creation is aborted immediately.
+   - If you say "yes", it is saved to `config/routines.yaml` and becomes immediately usable by voice (*"start study mode"*).
+
+### Permission Gate Guarantee
+
+> [!IMPORTANT]
+> **Zero Gate Bypass**:
+> Every single step of a routine is executed through `_execute_tool()`, which enforces:
+> - Safety Layer context validation
+> - Cost limits check
+> - **Permission Gate check**: Any destructive action (deleting files, force pushes, sensitive UI clicks, sudo actions) still requires explicit user spoken approval during routine execution.
+> - A routine can **never** contain flags or instructions that skip or bypass the Permission Gate.
+
+### Routines Test Checklist
+
+Run the complete routines test suite:
+```bash
+PYTHONPATH=. ./venv/bin/python tests/test_routines.py
+```
+
+- [ ] **Configuration Loading**: Verified starter routines (`work_mode`, `end_of_day`, `server_check`) loaded from `config/routines.yaml`.
+- [ ] **Voice Trigger Matching**: Verified matching of direct and colloquial trigger phrases.
+- [ ] **Dynamic Parameter Substitution**: Verified `{active_project_path}` resolves to the active project.
+- [ ] **Sequential Execution**: Verified all steps run in order through the tool execution pipeline.
+- [ ] **Voice Creation Parsing**: Verified conversion of natural phrases into tool definitions.
+- [ ] **Readback & Confirmation Gate**: Verified steps read aloud and routine discarded if user denies.
+- [ ] **Permission Gate Invariant**: Verified restricted tools trigger gates and cannot be bypassed.
+- [ ] **Tool Registry Integration**: Verified `run_routine`, `list_routines`, and `create_routine` registered.

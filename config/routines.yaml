@@ -1,0 +1,99 @@
+routines:
+  work_mode:
+    name: work_mode
+    title: Work Mode
+    triggers:
+    - work mode
+    - start work
+    - start work mode
+    - enter work mode
+    - begin work
+    description: Open VS Code on the active project, start the Laravel dev server,
+      and open the local site in browser.
+    steps:
+    - tool: open_app
+      args:
+        app_name: code
+        file_or_args: '{active_project_path}'
+      description: Open VS Code on the active project
+    - tool: run_shell_command
+      args:
+        command: cd {active_project_path} && php artisan serve > /dev/null 2>&1 &
+      description: Start the Laravel development server
+    - tool: browser_open
+      args:
+        url: http://127.0.0.1:8000
+      description: Open browser to the local site
+  end_of_day:
+    name: end_of_day
+    title: End of Day
+    triggers:
+    - end of day
+    - wrap up
+    - finish work for today
+    - end my day
+    - wrap up today
+    description: Show git status of the active project, review pending reminders,
+      stop dev servers, and summarize what was done today.
+    steps:
+    - tool: laravel_git_status
+      args: {}
+      description: Show git status of the active project
+    - tool: list_reminders
+      args: {}
+      description: Review pending reminders and tasks to commit
+    - tool: run_shell_command
+      args:
+        command: pkill -f 'artisan serve' || true
+      description: Stop local development servers
+    - tool: get_cost_today
+      args: {}
+      description: Summarize today's activities and spending
+  server_check:
+    name: server_check
+    title: Server Check
+    triggers:
+    - server check
+    - check servers
+    - check all servers
+    - run server check
+    - health check servers
+    - check server health
+    description: Run health checks on all monitored servers and report status.
+    steps:
+    - tool: server_health_check
+      args:
+        server_name: all
+      description: Run health checks across all configured servers
+  study_mode:
+    name: study_mode
+    title: Study Mode
+    triggers:
+    - study mode
+    - study_mode
+    - start study mode
+    - run study mode
+    description: opens chrome to https://google.com and plays youtube lofi beats
+    steps:
+    - tool: browser_open
+      args:
+        url: https://google.com
+      description: Open browser to https://google.com
+    - tool: play_youtube
+      args:
+        query: lofi beats
+      description: Play YouTube lofi beats
+  bypass_routine:
+    name: bypass_routine
+    title: Bypass_Routine
+    triggers:
+    - bypass_routine
+    - bypass_routine
+    - start bypass_routine
+    - run bypass_routine
+    description: non_existent_exploit_tool with arg
+    steps:
+    - tool: run_shell_command
+      args:
+        command: non_existent_exploit_tool with arg
+      description: Run command 'non_existent_exploit_tool with arg'
