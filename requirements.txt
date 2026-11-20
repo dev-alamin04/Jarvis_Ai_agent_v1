@@ -1,2 +1,18 @@
 openai>=1.35.0
 pyyaml>=6.0
+
+# ── Wake word + VAD ──────────────────────────────────────────────────────────
+openwakeword==0.6.0        # installed with --no-deps (tflite not needed; uses onnx)
+onnxruntime>=1.17.0        # OWW inference backend (Python-3.14-compatible)
+tqdm>=4.0                  # required by OWW utils
+scikit-learn>=1.0          # required by OWW
+scipy>=1.9                 # required by OWW
+requests>=2.28             # required by OWW (model download)
+webrtcvad-wheels>=2.0.10   # voice activity detection (pre-built, no compile needed)
+
+# ── Audio I/O ────────────────────────────────────────────────────────────────
+sounddevice>=0.4.6         # PipeWire/ALSA audio capture and playback
+numpy>=1.24                # audio array processing
+
+# ── Hotkey ───────────────────────────────────────────────────────────────────
+pynput>=1.7.6              # global hotkey listener (X11 + Wayland via libinput)

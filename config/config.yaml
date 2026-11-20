@@ -39,6 +39,16 @@ protected_paths:
   - /home/alamin/Server/jarvis/jarvis/permission_gate.py
   - /home/alamin/Server/jarvis/jarvis/self_update.py
 
+wake_word:
+  enabled: true                  # true = wake word mode, false = push-to-talk only
+  word: "hey jarvis"             # wake word (hey_jarvis | alexa | hey_mycroft | timmy)
+  sensitivity: 0.5               # 0.0–1.0; higher = more sensitive (more false triggers)
+  silence_timeout_s: 4.0         # seconds with no speech at all before cancelling
+  command_silence_s: 1.5         # seconds of silence to end command recording
+  vad_aggressiveness: 3          # webrtcvad aggressiveness 0–3 (3 = most aggressive)
+  mute_hotkey: "<ctrl>+<shift>+m"  # global hotkey to toggle mic mute
+  debug_save_audio: false        # save raw WAV to logs/debug_audio/ for debugging
+
 apps:
   # Friendly name -> command
   code: "code"
