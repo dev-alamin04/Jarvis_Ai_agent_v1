@@ -29,6 +29,7 @@ Jarvis is a private, voice-controlled desktop AI agent built for Linux laptops. 
 - **Persistent Long-Term Memory**: SQLite store for facts, preferences, and project contexts, with secret redaction and 3-minute sliding conversational memory.
 - **Screen Vision & Computer Control**: In-memory RAM-only screenshot analysis (`take_screenshot`, `fix_screen_error`), mouse and keyboard control, file management, and browser automation.
 - **Unified Multi-Platform Messaging**: Send messages on **WhatsApp**, **Facebook Messenger**, and **Telegram** using your own logged-in browser sessions.
+- **Laravel Developer Assistant**: Voice-activated assistant for Laravel 10/11 & Pest/PHPUnit: autonomous debug & patch loop, test runner, git automation, automatic database backups before destructive migrations, table schema inspection, artisan scaffolding, and 4-pillar code review. Strict security barrier blocking `.env` access.
 
 ---
 
@@ -143,3 +144,51 @@ PYTHONPATH=. ./venv/bin/python tests/test_messaging.py
 - [ ] Say: *"Send Sarah a Messenger message: Hello Sarah"*
 - [ ] Confirm contact search in search dropdown.
 - [ ] Verify spoken confirmation gate intercepts before typing.
+
+---
+
+## Laravel Developer Assistant
+
+Jarvis includes a complete assistant specialized for Laravel development workflows.
+
+### Capabilities & Tools
+
+1. **Active Project Resolution**: Uses persistent memory to track the active project (`name`, `path`, `type`).
+2. **Autonomous Debug & Fix**:
+   - `laravel_read_log`: Reads the latest exception from `storage/logs/laravel.log`.
+   - `laravel_debug_and_fix`: Bounded debug loop (max 3 tries). Isolates vendor stack frames from application code, proposes fixes using `gpt-4o`, applies them on a `fix/jarvis-...` git branch, and verifies against tests.
+3. **Pest & PHPUnit Test Automation**:
+   - `laravel_run_tests`: Runs tests and reads a concise spoken summary: *"All 12 tests passed successfully in 0.32 seconds."*
+   - `laravel_write_test`: Generates Pest or PHPUnit test suites for specified classes or endpoints.
+4. **Git Voice Workflows**:
+   - `laravel_git_status`, `laravel_git_diff`: Quick checks and summaries.
+   - `laravel_git_commit`: Generates clean, conventional commit messages from the diff.
+   - `laravel_git_create_branch`, `laravel_git_push`, `laravel_git_pr_description`: Effortless branch and PR management.
+   - **Permission Gate Checks**: `git push --force`, `git reset --hard`, and `git branch -D` require spoken confirmation.
+5. **Database Protection & Schemas**:
+   - `laravel_backup_database`: Creates timestamped backups in `storage/backups/`.
+   - `laravel_run_migrations`: Runs migrations. **Automatically takes a database backup before destructive migrations (`fresh`, `reset`, `rollback`)**, which also require spoken confirmation.
+   - `laravel_table_schema`: Inspects table columns, types, nullability, defaults, and primary keys via `artisan db:table` or SQLite.
+6. **Artisan Scaffolding & Routes**:
+   - `laravel_scaffold`: Creates controllers, models, migrations, factories, requests, and safely appends route definitions to `routes/web.php` or `routes/api.php`.
+7. **4-Pillar Code Review**:
+   - `laravel_code_review`: Analyzes current git diff across bugs, security flaws, performance/N+1 queries, and style conventions.
+
+### Strict `.env` & Secrets Security Invariant
+
+> [!CAUTION]
+> **Zero Access to Secrets**:
+> Reading, editing, grepping, or displaying `.env`, `.env.*`, `*secret*`, or SSH key files is strictly blocked by the Permission Gate. Jarvis will refuse with:
+> `"Access to .env files and secrets is blocked for security reasons."`
+
+### Laravel Test Checklist
+
+Run the automated Laravel test suite:
+```bash
+PYTHONPATH=. ./venv/bin/python tests/test_laravel_assistant.py
+```
+- [ ] Run test suite and confirm all 7 test suites pass.
+- [ ] Say: *"Hey Jarvis, what is my active project?"* $\rightarrow$ Verify active Laravel project reported.
+- [ ] Say: *"Hey Jarvis, read the .env file"* $\rightarrow$ Verify access is blocked with security notice.
+- [ ] Say: *"Hey Jarvis, run fresh migrations"* $\rightarrow$ Verify spoken confirmation prompted and backup created.
+- [ ] Say: *"Hey Jarvis, review my code changes"* $\rightarrow$ Verify 4-pillar review output.

@@ -42,6 +42,11 @@ _DEFAULT_COMPLEX_KEYWORDS = [
     "hotkey",
     "press",
     "form",
+    "artisan",
+    "pest",
+    "phpunit",
+    "migration",
+    "scaffold",
 ]
 
 

@@ -495,6 +495,12 @@ class MemoryManager:
     def record_command(self, cmd: str) -> None:
         self.long_term.record_project_command(cmd)
 
+    def get_active_project(self) -> dict[str, Any] | None:
+        return self.long_term.get_active_project()
+
+    def set_active_project(self, name: str, path: str | None = None) -> dict[str, Any]:
+        return self.long_term.set_active_project(name, path)
+
 
 # Global singleton instance
 memory_manager = MemoryManager()

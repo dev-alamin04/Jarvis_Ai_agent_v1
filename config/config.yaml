@@ -39,6 +39,11 @@ models:
     - "hotkey"
     - "press"
     - "form"
+    - "artisan"
+    - "pest"
+    - "phpunit"
+    - "migration"
+    - "scaffold"
 
 audio:
   sample_rate: 16000
@@ -63,9 +68,9 @@ memory:
   enable_interrupt: true          # allow saying 'stop' or 'quiet' to halt speech
 
 projects:
-  # Add your project paths here, e.g.:
-  # jarvis: /home/alamin/Server/jarvis
-  # my_app: /home/alamin/projects/my_app
+  mrym_laravel: /home/alamin/project/mrym_laravel
+  ibrahimcheikh_laravel: /home/alamin/project/ibrahimcheikh_laravel
+  jarvis: /home/alamin/Server/jarvis
 
 protected_paths:
   - /home/alamin/.ssh

@@ -42,6 +42,25 @@ from jarvis.tools.browser import (
     browser_fill_form,
 )
 from jarvis.tools.messaging_tools import send_message
+from jarvis.tools.laravel_tools import (
+    read_laravel_log,
+    laravel_debug_and_fix,
+    laravel_run_tests,
+    laravel_write_test,
+    laravel_git_status,
+    laravel_git_diff,
+    laravel_git_create_branch,
+    laravel_git_commit,
+    laravel_git_push,
+    laravel_git_pr_description,
+    laravel_git_reset_hard,
+    laravel_git_delete_branch,
+    laravel_run_migrations,
+    laravel_backup_database,
+    laravel_table_schema,
+    laravel_scaffold,
+    laravel_code_review,
+)
 
 
 @dataclass
@@ -611,6 +630,351 @@ _TOOL_DEFS: list[ToolDef] = [
                 },
             },
             "required": ["platform", "person_name", "text"],
+        },
+    ),
+
+    # ── read_laravel_log ─────────────────────────────────────────────────────
+    ToolDef(
+        name="read_laravel_log",
+        fn=read_laravel_log,
+        description="Read the most recent error entries and stack traces from storage/logs/laravel.log in the active Laravel project.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "lines": {
+                    "type": "integer",
+                    "description": "Number of log lines to inspect (default 60).",
+                },
+            },
+        },
+    ),
+
+    # ── laravel_debug_and_fix ────────────────────────────────────────────────
+    ToolDef(
+        name="laravel_debug_and_fix",
+        fn=laravel_debug_and_fix,
+        description=(
+            "Diagnose an error or failing test in the active Laravel project, locate the file and line, "
+            "propose a patch using gpt-4o, apply it on a dedicated git branch, and re-run verification. "
+            "Keeps the fix loop bounded to a small number of tries."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "test_filter": {
+                    "type": "string",
+                    "description": "Optional failing test filter (e.g. 'UserTest' or 'test_payment').",
+                },
+                "api_endpoint": {
+                    "type": "string",
+                    "description": "Optional failing API endpoint or route to verify.",
+                },
+                "max_attempts": {
+                    "type": "integer",
+                    "description": "Maximum number of fix attempts (default 3).",
+                },
+            },
+        },
+    ),
+
+    # ── laravel_run_tests ────────────────────────────────────────────────────
+    ToolDef(
+        name="laravel_run_tests",
+        fn=laravel_run_tests,
+        description="Run PHPUnit or Pest tests in the active Laravel project and report summary results by voice.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "test_filter": {
+                    "type": "string",
+                    "description": "Optional method or class filter (e.g. 'OrderTest' or 'can_create_order').",
+                },
+                "suite": {
+                    "type": "string",
+                    "description": "Optional test suite ('Unit' or 'Feature').",
+                },
+            },
+        },
+    ),
+
+    # ── laravel_write_test ───────────────────────────────────────────────────
+    ToolDef(
+        name="laravel_write_test",
+        fn=laravel_write_test,
+        description="Write and immediately run a new Pest or PHPUnit test for code, a model, or controller in the active Laravel project.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "target_name": {
+                    "type": "string",
+                    "description": "Name of the class or feature to test (e.g. 'UserController' or 'OrderService').",
+                },
+                "test_description": {
+                    "type": "string",
+                    "description": "Description of the test scenarios to implement.",
+                },
+                "test_framework": {
+                    "type": "string",
+                    "enum": ["pest", "phpunit"],
+                    "description": "Testing framework to use: 'pest' (default) or 'phpunit'.",
+                },
+            },
+            "required": ["target_name", "test_description"],
+        },
+    ),
+
+    # ── laravel_git_status ───────────────────────────────────────────────────
+    ToolDef(
+        name="laravel_git_status",
+        fn=laravel_git_status,
+        description="Get current git branch and working tree status for the active Laravel project.",
+        parameters={
+            "type": "object",
+            "properties": {},
+        },
+    ),
+
+    # ── laravel_git_diff ─────────────────────────────────────────────────────
+    ToolDef(
+        name="laravel_git_diff",
+        fn=laravel_git_diff,
+        description="Show git diff summary for changes in the active Laravel project.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "cached": {
+                    "type": "boolean",
+                    "description": "Whether to view staged changes (--cached).",
+                },
+                "file_path": {
+                    "type": "string",
+                    "description": "Optional specific file path to diff.",
+                },
+            },
+        },
+    ),
+
+    # ── laravel_git_create_branch ────────────────────────────────────────────
+    ToolDef(
+        name="laravel_git_create_branch",
+        fn=laravel_git_create_branch,
+        description="Create and switch to a new git branch in the active Laravel project.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "branch_name": {
+                    "type": "string",
+                    "description": "Name of the branch to create (e.g. 'feature/checkout-flow').",
+                },
+                "checkout": {
+                    "type": "boolean",
+                    "description": "Whether to switch to the new branch immediately (default true).",
+                },
+            },
+            "required": ["branch_name"],
+        },
+    ),
+
+    # ── laravel_git_commit ───────────────────────────────────────────────────
+    ToolDef(
+        name="laravel_git_commit",
+        fn=laravel_git_commit,
+        description=(
+            "Commit changes in the active Laravel project. "
+            "If message is omitted, automatically generates a clean conventional commit message from the diff."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "description": "Commit message. If omitted, will be auto-generated from git diff.",
+                },
+                "auto_generate": {
+                    "type": "boolean",
+                    "description": "Whether to auto-generate message if empty (default true).",
+                },
+            },
+        },
+    ),
+
+    # ── laravel_git_push ─────────────────────────────────────────────────────
+    ToolDef(
+        name="laravel_git_push",
+        fn=laravel_git_push,
+        description="Push commits to git remote. Force push requires user spoken confirmation.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "remote": {
+                    "type": "string",
+                    "description": "Remote name (default 'origin').",
+                },
+                "branch": {
+                    "type": "string",
+                    "description": "Branch to push (defaults to current branch).",
+                },
+                "force": {
+                    "type": "boolean",
+                    "description": "Force push flag. REQUIRES USER CONFIRMATION.",
+                },
+            },
+        },
+    ),
+
+    # ── laravel_git_pr_description ───────────────────────────────────────────
+    ToolDef(
+        name="laravel_git_pr_description",
+        fn=laravel_git_pr_description,
+        description="Generate a complete Pull Request title, description, and testing checklist in markdown from git log and diff.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "base_branch": {
+                    "type": "string",
+                    "description": "Target base branch to compare against (default 'main').",
+                },
+            },
+        },
+    ),
+
+    # ── laravel_git_reset_hard ───────────────────────────────────────────────
+    ToolDef(
+        name="laravel_git_reset_hard",
+        fn=laravel_git_reset_hard,
+        description="Hard reset the git working tree to target commit/HEAD. Discards uncommitted work. Requires user spoken confirmation.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "description": "Commit or ref to reset to (default 'HEAD').",
+                },
+            },
+        },
+    ),
+
+    # ── laravel_git_delete_branch ────────────────────────────────────────────
+    ToolDef(
+        name="laravel_git_delete_branch",
+        fn=laravel_git_delete_branch,
+        description="Delete a git branch in the active Laravel project. Requires user spoken confirmation.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "branch_name": {
+                    "type": "string",
+                    "description": "Name of the branch to delete.",
+                },
+                "force": {
+                    "type": "boolean",
+                    "description": "Force delete unmerged branch (-D).",
+                },
+            },
+            "required": ["branch_name"],
+        },
+    ),
+
+    # ── laravel_run_migrations ───────────────────────────────────────────────
+    ToolDef(
+        name="laravel_run_migrations",
+        fn=laravel_run_migrations,
+        description=(
+            "Run database migrations in the active Laravel project. "
+            "Destructive actions ('fresh', 'reset', 'rollback') automatically create a database backup first "
+            "and require user spoken confirmation."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["migrate", "rollback", "fresh", "reset", "status"],
+                    "description": "Migration action to execute (default 'migrate').",
+                },
+                "step": {
+                    "type": "integer",
+                    "description": "Number of migration batches to rollback (for rollback action).",
+                },
+            },
+        },
+    ),
+
+    # ── laravel_backup_database ──────────────────────────────────────────────
+    ToolDef(
+        name="laravel_backup_database",
+        fn=laravel_backup_database,
+        description="Create an immediate backup of the Laravel project database in storage/backups/.",
+        parameters={
+            "type": "object",
+            "properties": {},
+        },
+    ),
+
+    # ── laravel_table_schema ─────────────────────────────────────────────────
+    ToolDef(
+        name="laravel_table_schema",
+        fn=laravel_table_schema,
+        description="Inspect and display the column names, data types, nullability, and indexes of a database table.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "table_name": {
+                    "type": "string",
+                    "description": "Name of the table to inspect (e.g. 'users', 'orders').",
+                },
+            },
+            "required": ["table_name"],
+        },
+    ),
+
+    # ── laravel_scaffold ─────────────────────────────────────────────────────
+    ToolDef(
+        name="laravel_scaffold",
+        fn=laravel_scaffold,
+        description="Scaffold controllers, models, migrations, factories, requests, resources, or routes using artisan when you describe what you want.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "component_type": {
+                    "type": "string",
+                    "enum": ["controller", "model", "migration", "route", "factory", "seeder", "request", "resource"],
+                    "description": "Type of component to scaffold.",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name of the component or description for route.",
+                },
+                "options": {
+                    "type": "string",
+                    "description": "Extra artisan flags (e.g. '--resource', '-mfc', '--api').",
+                },
+                "route_definition": {
+                    "type": "string",
+                    "description": "Optional explicit PHP route definition line for route scaffolding.",
+                },
+            },
+            "required": ["component_type", "name"],
+        },
+    ),
+
+    # ── laravel_code_review ──────────────────────────────────────────────────
+    ToolDef(
+        name="laravel_code_review",
+        fn=laravel_code_review,
+        description="Perform a comprehensive code review of the current git diff in the active Laravel project, checking for bugs, security vulnerabilities (SQLi, IDOR, Mass Assignment, CSRF), performance (N+1 queries), and style.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "base_branch": {
+                    "type": "string",
+                    "description": "Optional base branch to compare diff against (default compares working tree / staged changes).",
+                },
+                "file_path": {
+                    "type": "string",
+                    "description": "Optional specific file to limit review to.",
+                },
+            },
         },
     ),
 ]

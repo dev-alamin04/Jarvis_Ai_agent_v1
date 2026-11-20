@@ -80,7 +80,42 @@ _ALWAYS_SAFE_TOOLS: set[str] = {
     "scroll_screen",
     "type_text",
     "press_hotkey",
+    # Laravel Assistant safe tools
+    "laravel_debug_and_fix",
+    "laravel_run_tests",
+    "laravel_write_test",
+    "laravel_git_status",
+    "laravel_git_diff",
+    "laravel_git_create_branch",
+    "laravel_git_commit",
+    "laravel_git_pr_description",
+    "laravel_backup_database",
+    "laravel_table_schema",
+    "laravel_scaffold",
+    "laravel_code_review",
 }
+
+# Pattern for strictly blocked environment and secret files
+_ENV_SECRET_PATTERN = re.compile(
+    r"(^|[/\s\"'])(\.env(?:\.[a-zA-Z0-9_-]+)?|id_rsa|id_ed25519|\.pem|\.key|\.pfx|\.keystore)(?:['\"\s]|$)",
+    re.IGNORECASE,
+)
+
+
+def _touches_env_or_secrets(args: dict, command: str = "") -> bool:
+    """Detect if any argument or shell command targets .env or secret keys."""
+    for val in args.values():
+        if isinstance(val, str) and _ENV_SECRET_PATTERN.search(val):
+            return True
+        elif isinstance(val, list):
+            for item in val:
+                if isinstance(item, str) and _ENV_SECRET_PATTERN.search(item):
+                    return True
+
+    if command and _ENV_SECRET_PATTERN.search(command):
+        return True
+
+    return False
 
 
 # ── Path protection ──────────────────────────────────────────────────────────
@@ -155,6 +190,15 @@ def check(tool_name: str, args: dict, speak_fn=None) -> None:
     PermissionDenied
         If the action is dangerous and the user does not approve.
     """
+    # 0. Strict Invariant: Never edit or read .env files or secrets.
+    cmd = str(args.get("command", ""))
+    if _touches_env_or_secrets(args, command=cmd):
+        msg = "Access to .env files and secrets is blocked for security reasons."
+        logger.warning(f"BLOCKED — {msg} (tool={tool_name})")
+        if speak_fn:
+            speak_fn(msg)
+        raise PermissionDenied(msg)
+
     # 1. Always-safe tools: pass through
     if tool_name in _ALWAYS_SAFE_TOOLS:
         return
@@ -251,6 +295,37 @@ def check(tool_name: str, args: dict, speak_fn=None) -> None:
             reason = "submitting a web form"
             _handle_dangerous(tool_name, args, reason, speak_fn)
             return
+
+    # 11. Laravel Git dangerous operations (Force push, hard reset, branch deletion)
+    if tool_name == "laravel_git_push":
+        if args.get("force", False) is True:
+            branch = args.get("branch") or "current branch"
+            _handle_dangerous(tool_name, args, f"force-pushing branch `{branch}` to remote (can overwrite history)", speak_fn)
+            return
+        return  # Standard non-force push is safe
+
+    if tool_name == "laravel_git_reset_hard":
+        target = args.get("target", "HEAD")
+        _handle_dangerous(tool_name, args, f"performing a hard git reset to `{target}` (discards uncommitted work)", speak_fn)
+        return
+
+    if tool_name == "laravel_git_delete_branch":
+        branch = args.get("branch_name", "branch")
+        _handle_dangerous(tool_name, args, f"deleting git branch `{branch}`", speak_fn)
+        return
+
+    # 12. Laravel Database destructive migrations (fresh, reset, rollback)
+    if tool_name == "laravel_run_migrations":
+        action = str(args.get("action", "")).lower().strip()
+        if action in ("fresh", "reset", "rollback"):
+            _handle_dangerous(
+                tool_name,
+                args,
+                f"running destructive migration `{action}` (a database backup will be created first)",
+                speak_fn,
+            )
+            return
+        return  # migrate, status are safe
 
 
 def _handle_dangerous(tool_name: str, args: dict, reason: str, speak_fn, custom_prompt: str | None = None) -> None:
