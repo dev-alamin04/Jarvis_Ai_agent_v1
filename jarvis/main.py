@@ -26,6 +26,15 @@ BANNER = """
 
 def main() -> None:
     print(BANNER)
+
+    # ── Verify Locked Files Integrity at Startup ──────────────────────────
+    from jarvis.self_update import check_locked_files_integrity
+    ok, integrity_msg = check_locked_files_integrity()
+    if not ok:
+        logger.critical(f"FATAL: Startup integrity check failed: {integrity_msg}")
+        print(f"\n❌ FATAL: {integrity_msg}\n")
+        sys.exit(1)
+
     logger.info("Jarvis Stage-1 (text mode) started.")
 
     conversation_history: list[dict] = []

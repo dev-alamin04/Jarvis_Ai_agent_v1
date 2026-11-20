@@ -649,12 +649,43 @@ def safety_check_before_execution(
     """
     Safety wrapper executed BEFORE `permission_gate.check`.
     Ensures all safety invariants are met:
+      0. Locked Files Invariant (Permission gate, config, safety, self-update, lock list)
       1. Read-only Panic check
       2. Central Tool Risk Table classification
       3. Second-Check against voice intent after untrusted content
       4. Taint tracking for content pasted from untrusted external sources
       5. Exact command announcement aloud for dangerous actions
     """
+    # 0. Strict Invariant: Never allow editing or modifying locked files (even on candidate)
+    from jarvis.self_update import is_locked_file
+    for key in ("path", "file_path", "destination", "source", "target"):
+        val = args.get(key)
+        if val and is_locked_file(val):
+            err = f"Security Violation: '{val}' is a LOCKED file and cannot be modified under any circumstances."
+            logger.warning(f"[Safety Layer] {err}")
+            if speak_fn:
+                speak_fn(f"Access Denied: File '{val}' is locked and cannot be modified.")
+            raise SafetyCheckFailed(err)
+
+    if tool_name == "move_files":
+        for src in args.get("sources", []):
+            if is_locked_file(src):
+                err = f"Security Violation: '{src}' is a LOCKED file and cannot be modified under any circumstances."
+                logger.warning(f"[Safety Layer] {err}")
+                if speak_fn:
+                    speak_fn(f"Access Denied: File '{src}' is locked and cannot be modified.")
+                raise SafetyCheckFailed(err)
+
+    if tool_name == "run_shell_command":
+        cmd = str(args.get("command", ""))
+        for locked_name in ("permission_gate.py", "config.py", "config.yaml", "safety.py", "self_update.py", "locked_files.json"):
+            if locked_name in cmd and any(p in cmd for p in (">", "rm ", "mv ", "sed ", "chmod ", "chown ", "cat ", "echo ")):
+                err = f"Security Violation: Command targets locked file '{locked_name}'. Modification of locked files is strictly blocked."
+                logger.warning(f"[Safety Layer] {err}")
+                if speak_fn:
+                    speak_fn(f"Access Denied: Command targets locked file '{locked_name}'.")
+                raise SafetyCheckFailed(err)
+
     # 1. Read-only panic mode check
     if is_read_only() and is_mutating_tool(tool_name):
         err = (

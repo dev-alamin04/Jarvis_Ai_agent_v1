@@ -23,6 +23,7 @@ data/*.db
 data/*.db-journal
 data/*.db-wal
 data/*.json
+!data/locked_files.json
 data/browser_profiles/
 
 # ── Secrets ──────────────────────────────────────

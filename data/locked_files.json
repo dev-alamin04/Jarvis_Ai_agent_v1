@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "description": "Cryptographic approved hashes for locked Jarvis security files.",
+  "updated_at": "2026-11-20T10:08:51.301913+00:00",
+  "hashes": {
+    "jarvis/permission_gate.py": "e98eec65de0050e286bdff08dadf3f18952bd59bbcd5581812dbc2310aec9a84",
+    "jarvis/config.py": "738bdb1220302c42562246f6fb513bc26634b9248eff3ec7b6dbdaf01d2b6035",
+    "config/config.yaml": "9e68c075e88f3cbb3cc024a1e8ec68dae494a5588caa79de0c7a147c4b77fbc0",
+    "jarvis/safety.py": "76fddfa6c770a7358c5b908277cb6bbee82712f1d846829a3cbf0069c2fcc152",
+    "jarvis/self_update.py": "470d4afb8f6c12b5e096698d86c526ed1e875e2b5a2734ac95f6b40b41d89859"
+  }
+}

@@ -104,6 +104,29 @@ def _on_command_received(pcm_bytes: bytes) -> None:
         ui_events.emit("reply", text=reply)
         return
 
+    # ── Check for Self-Review or Feature Improvement Commands ──
+    from jarvis.self_update import (
+        is_self_review_command,
+        handle_self_review_voice,
+        match_improve_feature_command,
+        handle_improve_feature_voice,
+    )
+    if is_self_review_command(text):
+        reply = handle_self_review_voice(speak_fn=speak)
+        print(f"Jarvis: {reply}\n")
+        ui_events.emit("reply", text=reply)
+        return
+
+    feat_target = match_improve_feature_command(text)
+    if feat_target:
+        reply = handle_improve_feature_voice(
+            feature_name=feat_target,
+            speak_fn=_speak_with_ui,
+        )
+        print(f"Jarvis: {reply}\n")
+        ui_events.emit("reply", text=reply)
+        return
+
     # 2. Brain (with sentence-level TTS streaming)
     ui_events.emit("state", state="thinking")           # ← UI hook
 
@@ -165,6 +188,14 @@ def _on_mute_change(is_muted: bool) -> None:
 
 def main() -> None:
     print(BANNER)
+
+    # ── Verify Locked Files Integrity at Startup ──────────────────────────
+    from jarvis.self_update import check_locked_files_integrity
+    ok, integrity_msg = check_locked_files_integrity()
+    if not ok:
+        logger.critical(f"FATAL: Startup integrity check failed: {integrity_msg}")
+        print(f"\n❌ FATAL: {integrity_msg}\n")
+        sys.exit(1)
 
     if not _WAKE_WORD_MODE:
         logger.warning(
