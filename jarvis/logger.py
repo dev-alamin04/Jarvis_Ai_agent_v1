@@ -41,6 +41,12 @@ def action_log(tool: str, args: dict, result: str, approved: bool = True) -> Non
     )
     logger.info(entry)
     try:
+        from jarvis.safety import log_tamper_evident_action
+        log_tamper_evident_action(tool=tool, args=args, result=result, status=status)
+    except Exception as exc:
+        logger.debug(f"Tamper evident log error: {exc}")
+
+    try:
         from jarvis import ui_events
         ts_short = datetime.now().strftime("%H:%M:%S")
         ui_events.emit("log", text=f"[{status}] {tool}", ts=ts_short)

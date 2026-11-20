@@ -85,6 +85,25 @@ def _on_command_received(pcm_bytes: bytes) -> None:
     print(f"\nYou: {text}")
     ui_events.emit("transcript", text=text)             # ← UI hook
 
+    # ── Check for Spoken Panic or Resume Commands ──────────────
+    from jarvis.safety import (
+        is_panic_command,
+        activate_panic,
+        is_resume_command,
+        deactivate_panic,
+    )
+    if is_panic_command(text):
+        reply = activate_panic(speak_fn=speak)
+        print(f"Jarvis: {reply}\n")
+        ui_events.emit("reply", text=reply)
+        return
+
+    if is_resume_command(text):
+        reply = deactivate_panic(speak_fn=speak)
+        print(f"Jarvis: {reply}\n")
+        ui_events.emit("reply", text=reply)
+        return
+
     # 2. Brain (with sentence-level TTS streaming)
     ui_events.emit("state", state="thinking")           # ← UI hook
 
