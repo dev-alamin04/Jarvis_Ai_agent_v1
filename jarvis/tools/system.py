@@ -30,6 +30,13 @@ def run_shell_command(
 
     logger.info(f"run_shell_command: {command!r}  cwd={cwd}")
 
+    # Track in active project history
+    try:
+        from jarvis.memory import memory_manager
+        memory_manager.record_command(command)
+    except Exception:
+        pass
+
     try:
         result = subprocess.run(
             command,

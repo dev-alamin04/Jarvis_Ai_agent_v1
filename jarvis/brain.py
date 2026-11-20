@@ -85,12 +85,19 @@ def process_turn(
     # Append user message
     conversation_history.append({"role": "user", "content": user_text})
 
+    # Dynamically inject ONLY relevant memory items and active project context
+    from jarvis.memory import memory_manager
+    mem_context = memory_manager.get_relevant_prompt_section(user_text)
+    dynamic_system_prompt = SYSTEM_PROMPT
+    if mem_context:
+        dynamic_system_prompt += f"\n\nContext & Memories:\n{mem_context}"
+
     for iteration in range(config.MAX_TOOL_ITERATIONS):
         logger.info(f"Brain iteration {iteration + 1}")
 
         response = client.chat.completions.create(
             model=config.OPENAI_MODEL,
-            messages=[{"role": "system", "content": SYSTEM_PROMPT}] + conversation_history,
+            messages=[{"role": "system", "content": dynamic_system_prompt}] + conversation_history,
             tools=tools,
             tool_choice="auto",
         )
@@ -101,6 +108,7 @@ def process_turn(
         if not message.tool_calls:
             reply = message.content or "(no reply)"
             conversation_history.append({"role": "assistant", "content": reply})
+            memory_manager.short_term.set_messages(conversation_history)
             return reply
 
         # ── Append the assistant's tool-call message ──────────────────────
@@ -126,6 +134,7 @@ def process_turn(
     # Hit iteration limit
     fallback = "I reached the maximum number of tool calls for this request. Please try a simpler command."
     conversation_history.append({"role": "assistant", "content": fallback})
+    memory_manager.short_term.set_messages(conversation_history)
     return fallback
 
 

@@ -60,6 +60,10 @@ _ALWAYS_SAFE_TOOLS: set[str] = {
     "list_directory",
     "read_laravel_log",
     "switch_project",
+    "remember_fact",
+    "recall_facts",
+    "get_project_context",
+    "set_project_context",
 }
 
 
@@ -174,6 +178,13 @@ def check(tool_name: str, args: dict, speak_fn=None) -> None:
             reason = f"stopping/disabling a service (`{args.get('service', '?')}`)"
             _handle_dangerous(tool_name, args, reason, speak_fn)
             return
+
+    # 7. Memory deletion requires spoken confirmation
+    if tool_name == "forget_fact":
+        query = args.get("query", "")
+        reason = f"it will delete stored memories matching `{query}`"
+        _handle_dangerous(tool_name, args, reason, speak_fn)
+        return
 
 
 def _handle_dangerous(tool_name: str, args: dict, reason: str, speak_fn) -> None:

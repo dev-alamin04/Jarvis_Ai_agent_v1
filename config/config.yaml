@@ -24,6 +24,12 @@ logging:
   self_review_log: "logs/self_review.log"
   level: "INFO"
 
+memory:
+  short_term_ttl_seconds: 180     # 3 minutes default (resets context after 3m idle)
+  max_short_term_turns: 10        # maximum exchange turns kept in active window
+  db_path: "data/memory.db"       # SQLite database for long-term facts
+  enable_interrupt: true          # allow saying 'stop' or 'quiet' to halt speech
+
 projects:
   # Add your project paths here, e.g.:
   # jarvis: /home/alamin/Server/jarvis

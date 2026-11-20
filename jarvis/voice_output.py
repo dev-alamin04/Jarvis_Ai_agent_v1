@@ -21,9 +21,67 @@ from openai import OpenAI
 from jarvis import audio_state
 from jarvis.config import TTS_MODEL, TTS_VOICE
 from jarvis.logger import logger
+from jarvis.vad import VADFramer
 
 _SAMPLE_RATE = 24_000   # OpenAI TTS PCM output is 24 kHz
 _client: OpenAI | None = None
+_INTERRUPT_KEYWORDS = {"stop", "quiet", "hush", "shut up", "silence", "pause", "cancel"}
+
+
+def _interrupt_monitor(stop_event: threading.Event) -> None:
+    """
+    Listens on the microphone while the agent is speaking.
+    If the user says 'stop', 'quiet', etc., sets audio_state.interrupted to halt speech.
+    """
+    try:
+        from jarvis.voice_input import transcribe
+        vad = VADFramer(aggressiveness=2, frame_ms=30)
+
+        with sd.InputStream(samplerate=16000, channels=1, dtype="int16", blocksize=480) as mic_stream:
+            collected_frames = []
+            speech_frames_count = 0
+
+            while not stop_event.is_set() and audio_state.speaking.is_set() and not audio_state.interrupted.is_set():
+                data, _ = mic_stream.read(480)
+                raw_bytes = data.tobytes()
+
+                for frame, is_speech in vad.feed(raw_bytes):
+                    if is_speech:
+                        speech_frames_count += 1
+                        collected_frames.append(frame)
+                    elif speech_frames_count > 0:
+                        collected_frames.append(frame)
+                        # Once we have ~450ms of speech followed by silence, check keyword
+                        if len(collected_frames) >= 15:
+                            audio_pcm = b"".join(collected_frames)
+                            collected_frames = []
+                            speech_frames_count = 0
+                            try:
+                                text = transcribe(audio_pcm)
+                                text_lower = text.lower()
+                                if any(kw in text_lower for kw in _INTERRUPT_KEYWORDS):
+                                    logger.info(f"Speech interrupted: detected '{text}'")
+                                    audio_state.interrupted.set()
+                                    return
+                            except Exception as exc:
+                                logger.debug(f"Interrupt transcribe error: {exc}")
+                            break
+
+                    # Cap continuous collection at ~1.5s
+                    if len(collected_frames) >= 50:
+                        audio_pcm = b"".join(collected_frames)
+                        collected_frames = []
+                        speech_frames_count = 0
+                        try:
+                            text = transcribe(audio_pcm)
+                            if any(kw in text.lower() for kw in _INTERRUPT_KEYWORDS):
+                                logger.info(f"Speech interrupted: detected '{text}'")
+                                audio_state.interrupted.set()
+                                return
+                        except Exception:
+                            pass
+    except Exception as exc:
+        logger.debug(f"Interrupt monitor error: {exc}")
 
 
 def _get_client() -> OpenAI:
@@ -67,11 +125,27 @@ def speak(text: str) -> None:
 
     # Set speaking flag BEFORE playback (self-trigger guard)
     audio_state.speaking.set()
+    audio_state.interrupted.clear()
+
+    # Launch background monitor for 'stop' / 'quiet' interruption
+    import threading
+    stop_monitor = threading.Event()
+    monitor_thread = threading.Thread(
+        target=_interrupt_monitor,
+        args=(stop_monitor,),
+        name="interrupt-monitor",
+        daemon=True,
+    )
+    monitor_thread.start()
+
     try:
         from jarvis import ui_events
         chunk_size = 1024
         with sd.OutputStream(samplerate=_SAMPLE_RATE, channels=1, dtype='float32') as stream:
             for i in range(0, len(audio), chunk_size):
+                if audio_state.interrupted.is_set():
+                    logger.info("Speech playback stopped by interruption.")
+                    break
                 chunk = audio[i:i + chunk_size]
                 stream.write(chunk)
                 rms = float(np.sqrt(np.mean(chunk ** 2)))
@@ -79,4 +153,5 @@ def speak(text: str) -> None:
     except Exception as exc:
         logger.error(f"Audio playback failed: {exc}")
     finally:
+        stop_monitor.set()
         audio_state.speaking.clear()

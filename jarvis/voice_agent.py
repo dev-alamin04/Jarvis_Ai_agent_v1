@@ -101,9 +101,12 @@ def _on_command_received(pcm_bytes: bytes) -> None:
         ui_events.emit("state", state="thinking")       # resume thinking after speak
 
     with _history_lock:
+        from jarvis.memory import memory_manager
+        # Auto-expires after configurable TTL (default 3 minutes)
+        active_history = memory_manager.short_term.get_messages()
         reply = process_turn(
             user_text=text,
-            conversation_history=_conversation_history,
+            conversation_history=active_history,
             speak_fn=_speak_with_ui,
         )
 
@@ -119,6 +122,8 @@ def _on_command_received(pcm_bytes: bytes) -> None:
 
 def _on_mute_change(is_muted: bool) -> None:
     """Called when the mute hotkey is pressed."""
+    if is_muted:
+        audio_state.interrupted.set()                   # halt ongoing speech immediately
     mute_beep(is_muted)
     state_text = "Microphone muted." if is_muted else "Microphone unmuted."
     logger.info(state_text)

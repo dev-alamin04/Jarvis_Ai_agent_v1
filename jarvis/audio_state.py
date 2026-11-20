@@ -21,5 +21,8 @@ muted = threading.Event()
 # Set while a command is actively being recorded after wake word
 recording = threading.Event()
 
+# Set when user interrupts ongoing speech (e.g. saying 'stop' or 'quiet')
+interrupted = threading.Event()
+
 # Set to signal the wake word thread to stop cleanly (shutdown)
 shutdown = threading.Event()

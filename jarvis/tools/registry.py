@@ -15,6 +15,13 @@ from typing import Callable, Any
 
 # ── Import tool implementations ───────────────────────────────────────────────
 from jarvis.tools.system import run_shell_command, open_app, open_url, play_youtube
+from jarvis.tools.memory_tools import (
+    remember_fact,
+    recall_facts,
+    forget_fact,
+    set_project_context,
+    get_project_context,
+)
 
 
 @dataclass
@@ -127,6 +134,105 @@ _TOOL_DEFS: list[ToolDef] = [
                 },
             },
             "required": ["query"],
+        },
+    ),
+
+    # ── remember_fact ────────────────────────────────────────────────────────
+    ToolDef(
+        name="remember_fact",
+        fn=remember_fact,
+        description=(
+            "Save an important fact, user preference, server address, project detail, "
+            "or note to persistent long-term memory so you remember it in future sessions. "
+            "Use this when the user says 'remember this', 'remember that...', or shares personal preferences."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The exact fact or note to remember (no credentials or passwords).",
+                },
+            },
+            "required": ["text"],
+        },
+    ),
+
+    # ── recall_facts ─────────────────────────────────────────────────────────
+    ToolDef(
+        name="recall_facts",
+        fn=recall_facts,
+        description=(
+            "Search persistent long-term memory for stored facts, preferences, server details, "
+            "or project notes matching a topic or keyword."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Keywords or search term to look up in memory.",
+                },
+            },
+            "required": ["query"],
+        },
+    ),
+
+    # ── forget_fact ──────────────────────────────────────────────────────────
+    ToolDef(
+        name="forget_fact",
+        fn=forget_fact,
+        description=(
+            "Delete stored memories or facts matching a keyword. "
+            "Requires user confirmation through the permission gate before taking effect."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Keywords identifying the memory items to delete.",
+                },
+            },
+            "required": ["query"],
+        },
+    ),
+
+    # ── set_project_context ──────────────────────────────────────────────────
+    ToolDef(
+        name="set_project_context",
+        fn=set_project_context,
+        description=(
+            "Set or switch the active project context in memory, including project name, path, "
+            "and detected project framework (e.g. Laravel, Flutter, Python, Node.js)."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "The project identifier or name.",
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Optional absolute filesystem path to the project root.",
+                },
+            },
+            "required": ["name"],
+        },
+    ),
+
+    # ── get_project_context ──────────────────────────────────────────────────
+    ToolDef(
+        name="get_project_context",
+        fn=get_project_context,
+        description=(
+            "Retrieve details about the current active project, its framework type, "
+            "and recent commands run there."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {},
         },
     ),
 ]
